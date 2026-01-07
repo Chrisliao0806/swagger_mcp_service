@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Chat - 智慧助手</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #252525;
+            --bg-hover: #2a2a2a;
+            --text-primary: #f5f5f5;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6b6b6b;
+            --accent-primary: #7c3aed;
+            --accent-secondary: #8b5cf6;
+            --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+            --border-color: #333;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-full: 9999px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 側邊欄 */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--accent-gradient);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .new-chat-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .server-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .server-item {
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .server-item:hover {
+            border-color: var(--border-color);
+        }
+
+        .server-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .server-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
+        }
+
+        .server-tools {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* 主要聊天區域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .chat-header {
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            padding: 8px 12px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .header-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        /* 訊息區域 */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .message {
+            display: flex;
+            gap: 16px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: var(--accent-gradient);
+        }
+
+        .message.assistant .message-avatar {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+        }
+
+        .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .message-author {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .message-body {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-primary);
+        }
+
+        .message-body p {
+            margin-bottom: 12px;
+        }
+
+        .message-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-body pre {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            overflow-x: auto;
+            margin: 12px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .message-body code {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+        }
+
+        .message-body :not(pre) > code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        .message-body ul, .message-body ol {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+
+        .message-body li {
+            margin: 6px 0;
+        }
+
+        .message-body h1, .message-body h2, .message-body h3 {
+            margin: 16px 0 8px;
+            font-weight: 600;
+        }
+
+        .message-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+
+        .message-body th, .message-body td {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .message-body th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+        }
+
+        /* 工具呼叫顯示 */
+        .tool-call {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            margin: 12px 0;
+            overflow: hidden;
+        }
+
+        .tool-call-header {
+            padding: 10px 14px;
+            background: var(--bg-hover);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .tool-call-header:hover {
+            background: var(--bg-secondary);
+        }
+
+        .tool-icon {
+            font-size: 1rem;
+        }
+
+        .tool-name {
+            font-weight: 600;
+            color: var(--accent-secondary);
+        }
+
+        .tool-status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tool-status.running {
+            color: var(--warning-color);
+        }
+
+        .tool-status.done {
+            color: var(--success-color);
+        }
+
+        .tool-call-body {
+            padding: 12px 14px;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .tool-call-body.expanded {
+            display: block;
+        }
+
+        .tool-call-body pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* 打字動畫 */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 4px 0;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-4px); opacity: 1; }
+        }
+
+        /* 輸入區域 */
+        .chat-input-container {
+            padding: 20px 24px 24px;
+            background: linear-gradient(transparent, var(--bg-primary) 20%);
+        }
+
+        .chat-input-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .chat-input-wrapper:focus-within {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .chat-input {
+            width: 100%;
+            padding: 16px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit;
+            resize: none;
+            max-height: 200px;
+            line-height: 1.5;
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .chat-input:focus {
+            outline: none;
+        }
+
+        .chat-input-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .input-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .send-btn {
+            padding: 10px 20px;
+            background: var(--accent-gradient);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 歡迎畫面 */
+        .welcome-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--accent-gradient);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .welcome-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin-bottom: 32px;
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            max-width: 600px;
+        }
+
+        .quick-action {
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-action:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+        }
+
+        /* 手機版隱藏側邊欄 */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 100;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .mobile-menu-btn {
+                display: flex;
+            }
+        }
+
+        /* 滾動條樣式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* 閃爍游標 */
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background: var(--accent-primary);
+            margin-left: 2px;
+            animation: blink 1s infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 側邊欄 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">🤖</div>
+                    <span>MCP Chat</span>
+                </div>
+                <button class="new-chat-btn" onclick="newChat()">
+                    <span>+</span>
+                    <span>新對話</span>
+                </button>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="section-title">已連接的服務</div>
+                <div class="server-list" id="serverList">
+                    <div class="server-item">
+                        <div class="server-name">
+                            <span class="server-status"></span>
+                            載入中...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="statusText">連線中...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主要內容區 -->
+        <main class="main-content">
+            <header class="chat-header">
+                <div class="chat-title" id="chatTitle">💬 新對話</div>
+                <div class="header-actions">
+                    <button class="header-btn" onclick="showTools()">🛠️ 工具</button>
+                    <button class="header-btn" onclick="clearChat()">🗑️ 清除</button>
+                </div>
+            </header>
+
+            <!-- 聊天訊息區 -->
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-icon">💬</div>
+                    <h1 class="welcome-title">歡迎使用 MCP Chat</h1>
+                    <p class="welcome-subtitle">
+                        我是您的智慧助手，可以協助您操作 API、查詢資料、執行各種任務。
+                        請隨時開始對話！
+                    </p>
+                    <div class="quick-actions">
+                        <button class="quick-action" onclick="sendQuickMessage('請列出所有可用的工具')">📋 查看可用工具</button>
+                        <button class="quick-action" onclick="sendQuickMessage('你能幫我做什麼？')">❓ 功能介紹</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 輸入區域 -->
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <textarea 
+                        class="chat-input" 
+                        id="chatInput" 
+                        placeholder="輸入訊息..." 
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                        oninput="autoResize(this)"
+                    ></textarea>
+                    <div class="chat-input-actions">
+                        <span class="input-hint">按 Enter 送出，Shift + Enter 換行</span>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                            <span>送出</span>
+                            <span>→</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 全域變數
+        let sessionId = null;
+        let isStreaming = false;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkStatus();
+            await createSession();
+            
+            // 設定 marked 選項
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return hljs.highlightAuto(code).value;
+                },
+                breaks: true,
+                gfm: true,
+            });
+        });
+
+        // 檢查伺服器狀態
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                if (data.connected) {
+                    document.getElementById('statusText').textContent = `${data.total_tools} 個工具就緒`;
+                    
+                    // 更新 server 列表
+                    const serverList = document.getElementById('serverList');
+                    serverList.innerHTML = data.servers.map(server => `
+                        <div class="server-item">
+                            <div class="server-name">
+                                <span class="server-status"></span>
+                                ${server.name}
+                            </div>
+                            <div class="server-tools">${server.tool_count} 個工具</div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('statusText').textContent = '未連接';
+                }
+            } catch (err) {
+                console.error('Status check failed:', err);
+                document.getElementById('statusText').textContent = '連線失敗';
+            }
+        }
+
+        // 建立 session
+        async function createSession() {
+            try {
+                const res = await fetch('/api/session', { method: 'POST' });
+                const data = await res.json();
+                sessionId = data.session_id;
+            } catch (err) {
+                console.error('Failed to create session:', err);
+            }
+        }
+
+        // 新對話
+        async function newChat() {
+            await createSession();
+            document.getElementById('chatMessages').innerHTML = `
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-icon">💬</div>
+                    <h1 class="welcome-title">歡迎使用 MCP Chat</h1>
+                    <p class="welcome-subtitle">
+                        我是您的智慧助手，可以協助您操作 API、查詢資料、執行各種任務。
+                        請隨時開始對話！
+                    </p>
+                    <div class="quick-actions">
+                        <button class="quick-action" onclick="sendQuickMessage('請列出所有可用的工具')">📋 查看可用工具</button>
+                        <button class="quick-action" onclick="sendQuickMessage('你能幫我做什麼？')">❓ 功能介紹</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 清除聊天
+        function clearChat() {
+            newChat();
+        }
+
+        // 顯示工具
+        async function showTools() {
+            try {
+                const res = await fetch('/api/tools');
+                const data = await res.json();
+                
+                const toolsHtml = data.tools.map(t => 
+                    `<strong>${t.name}</strong>: ${t.description}`
+                ).join('<br><br>');
+                
+                alert('可用工具：\n\n' + data.tools.map(t => `• ${t.name}`).join('\n'));
+            } catch (err) {
+                console.error('Failed to fetch tools:', err);
+            }
+        }
+
+        // 快速訊息
+        function sendQuickMessage(message) {
+            document.getElementById('chatInput').value = message;
+            sendMessage();
+        }
+
+        // 處理按鍵
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // 自動調整高度
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+        }
+
+        // 取得當前時間
+        function getCurrentTime() {
+            return new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // 發送訊息
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message || isStreaming || !sessionId) return;
+            
+            // 隱藏歡迎畫面
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            if (welcomeScreen) {
+                welcomeScreen.remove();
+            }
+            
+            // 清空輸入框
+            input.value = '';
+            input.style.height = 'auto';
+            
+            // 添加使用者訊息
+            addMessage('user', message);
+            
+            // 添加助手訊息佔位
+            const assistantMsgId = addMessage('assistant', '', true);
+            
+            // 開始 streaming
+            isStreaming = true;
+            updateSendButton();
+            
+            try {
+                const response = await fetch(`/api/chat/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message }),
+                });
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                let fullContent = '';
+                let toolCalls = [];
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'token') {
+                                    fullContent += data.content;
+                                    updateMessageContent(assistantMsgId, fullContent, true);
+                                } else if (data.type === 'tool_start') {
+                                    addToolCall(assistantMsgId, data.name, 'running', data.input);
+                                } else if (data.type === 'tool_end') {
+                                    updateToolCall(assistantMsgId, data.name, 'done', data.output);
+                                } else if (data.type === 'done') {
+                                    updateMessageContent(assistantMsgId, fullContent, false);
+                                } else if (data.type === 'error') {
+                                    updateMessageContent(assistantMsgId, `❌ 錯誤：${data.message}`, false);
+                                }
+                            } catch (e) {
+                                // 忽略解析錯誤
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Stream error:', err);
+                updateMessageContent(assistantMsgId, `❌ 連線錯誤：${err.message}`, false);
+            }
+            
+            isStreaming = false;
+            updateSendButton();
+        }
+
+        // 添加訊息
+        function addMessage(role, content, streaming = false) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const msgId = 'msg-' + Date.now();
+            
+            const isUser = role === 'user';
+            const avatar = isUser ? '👤' : '🤖';
+            const author = isUser ? '您' : 'MCP 助手';
+            
+            const msgHtml = `
+                <div class="message ${role}" id="${msgId}">
+                    <div class="message-avatar">${avatar}</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-author">${author}</span>
+                            <span class="message-time">${getCurrentTime()}</span>
+                        </div>
+                        <div class="message-body" id="${msgId}-body">
+                            ${streaming ? '<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>' : marked.parse(content)}
+                        </div>
+                        <div class="tool-calls" id="${msgId}-tools"></div>
+                    </div>
+                </div>
+            `;
+            
+            messagesDiv.insertAdjacentHTML('beforeend', msgHtml);
+            scrollToBottom();
+            
+            return msgId;
+        }
+
+        // 更新訊息內容
+        function updateMessageContent(msgId, content, streaming) {
+            const bodyDiv = document.getElementById(`${msgId}-body`);
+            if (!bodyDiv) return;
+            
+            if (streaming) {
+                // Streaming 時顯示原始文字 + 閃爍游標
+                bodyDiv.innerHTML = marked.parse(content) + '<span class="cursor"></span>';
+            } else {
+                // 完成後渲染 Markdown
+                bodyDiv.innerHTML = marked.parse(content);
+                // 高亮程式碼
+                bodyDiv.querySelectorAll('pre code').forEach(block => {
+                    hljs.highlightElement(block);
+                });
+            }
+            
+            scrollToBottom();
+        }
+
+        // 添加工具呼叫
+        function addToolCall(msgId, toolName, status, input) {
+            const toolsDiv = document.getElementById(`${msgId}-tools`);
+            if (!toolsDiv) return;
+            
+            const toolId = `${msgId}-tool-${toolName}`;
+            const statusIcon = status === 'running' ? '⏳' : '✅';
+            const statusText = status === 'running' ? '執行中...' : '完成';
+            
+            const toolHtml = `
+                <div class="tool-call" id="${toolId}">
+                    <div class="tool-call-header" onclick="toggleToolCall('${toolId}')">
+                        <span class="tool-icon">🔧</span>
+                        <span class="tool-name">${toolName}</span>
+                        <div class="tool-status ${status}">
+                            <span>${statusIcon}</span>
+                            <span>${statusText}</span>
+                        </div>
+                    </div>
+                    <div class="tool-call-body" id="${toolId}-body">
+                        <strong>輸入參數：</strong>
+                        <pre>${JSON.stringify(input, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+            
+            toolsDiv.insertAdjacentHTML('beforeend', toolHtml);
+            scrollToBottom();
+        }
+
+        // 更新工具呼叫
+        function updateToolCall(msgId, toolName, status, output) {
+            const toolId = `${msgId}-tool-${toolName}`;
+            const toolDiv = document.getElementById(toolId);
+            if (!toolDiv) return;
+            
+            const statusDiv = toolDiv.querySelector('.tool-status');
+            if (statusDiv) {
+                statusDiv.className = `tool-status ${status}`;
+                statusDiv.innerHTML = `<span>✅</span><span>完成</span>`;
+            }
+            
+            const bodyDiv = document.getElementById(`${toolId}-body`);
+            if (bodyDiv) {
+                bodyDiv.innerHTML += `
+                    <br><strong>輸出結果：</strong>
+                    <pre>${output}</pre>
+                `;
+            }
+        }
+
+        // 切換工具呼叫展開
+        function toggleToolCall(toolId) {
+            const bodyDiv = document.getElementById(`${toolId}-body`);
+            if (bodyDiv) {
+                bodyDiv.classList.toggle('expanded');
+            }
+        }
+
+        // 捲動到底部
+        function scrollToBottom() {
+            const messagesDiv = document.getElementById('chatMessages');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // 更新送出按鈕
+        function updateSendButton() {
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = isStreaming;
+            btn.innerHTML = isStreaming 
+                ? '<span>處理中...</span>' 
+                : '<span>送出</span><span>→</span>';
+        }
+    </script>
+</body>
+</html>
