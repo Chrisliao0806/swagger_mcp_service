@@ -319,9 +319,14 @@ class MCPWebServer:
         }
 
     async def _connect_openapi_server(
-        self, server_config: Dict[str, Any]
+        self, server_config: Dict[str, Any], server_index: int = 0
     ) -> Optional[List]:
-        """連接 OpenAPI 類型的 MCP Server"""
+        """連接 OpenAPI 類型的 MCP Server
+        
+        Args:
+            server_config: Server 配置
+            server_index: 在所有 enabled openapi servers 中的索引
+        """
         server_name = server_config.get("name", "OpenAPI Server")
         try:
             logger.debug("   📡 解析 OpenAPI 規格...")
@@ -336,7 +341,7 @@ class MCPWebServer:
             server_path = str(Path(__file__).parent / "server.py")
             server_params = StdioServerParameters(
                 command="python",
-                args=[server_path, self.config_path],
+                args=[server_path, self.config_path, str(server_index)],
             )
 
             logger.debug(f"   🚀 啟動 MCP Server 子程序...")
@@ -506,6 +511,9 @@ class MCPWebServer:
         logger.info("🔌 正在連接 MCP Servers...")
         logger.info("=" * 50)
 
+        # 追蹤 openapi server 的索引
+        openapi_server_index = 0
+
         for server_config in self.mcp_servers:
             server_name = server_config.get("name", "Unknown")
             server_type = server_config.get("type", "unknown")
@@ -514,7 +522,8 @@ class MCPWebServer:
 
             tools = None
             if server_type == "openapi":
-                tools = await self._connect_openapi_server(server_config)
+                tools = await self._connect_openapi_server(server_config, openapi_server_index)
+                openapi_server_index += 1  # 遞增 openapi server 索引
             elif server_type == "external":
                 tools = await self._connect_external_server(server_config)
 

@@ -94,19 +94,22 @@ logger = logging.getLogger(__name__)
 class GenericMCPServer:
     """通用 MCP Server - 從 OpenAPI 規格自動生成工具"""
 
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: str = None, server_index: int = 0):
         """
         初始化 Generic MCP Server
 
         Args:
             config_path: 設定檔路徑，預設為同目錄下的 config.yaml
+            server_index: 要使用的 openapi server 索引（當有多個 openapi server 時）
         """
         # 載入設定
         self.config = load_config(config_path)
+        self.server_index = server_index
         logger.info("設定檔載入完成: %s", config_path or "預設路徑")
+        logger.info("使用 OpenAPI Server 索引: %d", server_index)
 
         # 解析 OpenAPI
-        self.parser = OpenAPIParser(self.config)
+        self.parser = OpenAPIParser(self.config, server_index)
         self.parsed_spec = self.parser.parse()
         logger.info("OpenAPI 規格解析完成")
 
@@ -135,11 +138,15 @@ class GenericMCPServer:
 
     def _get_api_config(self) -> dict:
         """取得 API 配置（支援新舊格式）"""
-        # 新格式：從 mcp_servers 中找第一個 openapi 類型的 server
+        # 新格式：從 mcp_servers 中找指定索引的 openapi 類型的 server
         if "mcp_servers" in self.config:
-            for server in self.config["mcp_servers"]:
-                if server.get("type") == "openapi" and server.get("enabled", True):
-                    return server.get("openapi", {})
+            openapi_servers = [
+                server
+                for server in self.config["mcp_servers"]
+                if server.get("type") == "openapi" and server.get("enabled", True)
+            ]
+            if openapi_servers and self.server_index < len(openapi_servers):
+                return openapi_servers[self.server_index].get("openapi", {})
 
         # 舊格式：直接使用 api 區塊
         return self.config.get("api", {})
@@ -150,11 +157,17 @@ class GenericMCPServer:
 
     def _get_server_name(self) -> str:
         """取得 server 名稱"""
-        # 新格式：從 mcp_servers 取得
+        # 新格式：從 mcp_servers 取得指定索引的 server 名稱
         if "mcp_servers" in self.config:
-            for server in self.config["mcp_servers"]:
-                if server.get("type") == "openapi" and server.get("enabled", True):
-                    return server.get("name", self.api_info["title"])
+            openapi_servers = [
+                server
+                for server in self.config["mcp_servers"]
+                if server.get("type") == "openapi" and server.get("enabled", True)
+            ]
+            if openapi_servers and self.server_index < len(openapi_servers):
+                return openapi_servers[self.server_index].get(
+                    "name", self.api_info["title"]
+                )
 
         # 舊格式：從 mcp_server 取得
         return self.config.get("mcp_server", {}).get("name", self.api_info["title"])
@@ -460,12 +473,19 @@ def {name}({params_str}) -> str:
 
 
 def main():
-    # 支援命令列指定設定檔
+    # 支援命令列指定設定檔和 server index
     config_path = None
+    server_index = 0
+
     if len(sys.argv) > 1:
         config_path = sys.argv[1]
+    if len(sys.argv) > 2:
+        try:
+            server_index = int(sys.argv[2])
+        except ValueError:
+            logger.warning("無效的 server_index: %s，使用預設值 0", sys.argv[2])
 
-    server = GenericMCPServer(config_path)
+    server = GenericMCPServer(config_path, server_index)
     server.run()
 
 

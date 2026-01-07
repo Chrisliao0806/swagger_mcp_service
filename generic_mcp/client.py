@@ -191,9 +191,15 @@ class GenericMCPClient:
         return value
 
     async def _connect_openapi_server(
-        self, server_config: Dict[str, Any], stack: AsyncExitStack
+        self, server_config: Dict[str, Any], stack: AsyncExitStack, server_index: int = 0
     ) -> Optional[List]:
-        """連接 OpenAPI 類型的 MCP Server"""
+        """連接 OpenAPI 類型的 MCP Server
+        
+        Args:
+            server_config: Server 配置
+            stack: AsyncExitStack
+            server_index: 在所有 enabled openapi servers 中的索引
+        """
         server_name = server_config.get("name", "OpenAPI Server")
 
         try:
@@ -209,10 +215,10 @@ class GenericMCPClient:
             # 啟動內建的 server.py
             server_path = str(Path(__file__).parent / "server.py")
 
-            # 建立臨時設定檔路徑（使用原始設定）
+            # 建立臨時設定檔路徑（使用原始設定），並傳入 server_index
             server_params = StdioServerParameters(
                 command="python",
-                args=[server_path, self.config_path],
+                args=[server_path, self.config_path, str(server_index)],
             )
 
             # 建立連線
@@ -350,6 +356,9 @@ class GenericMCPClient:
             print("\n🔌 正在連接 MCP Servers...")
             print("-" * 40)
 
+            # 追蹤 openapi server 的索引
+            openapi_server_index = 0
+
             # 連接所有啟用的 MCP servers
             for server_config in self.mcp_servers:
                 server_name = server_config.get("name", "Unknown")
@@ -359,7 +368,8 @@ class GenericMCPClient:
 
                 tools = None
                 if server_type == "openapi":
-                    tools = await self._connect_openapi_server(server_config, stack)
+                    tools = await self._connect_openapi_server(server_config, stack, openapi_server_index)
+                    openapi_server_index += 1  # 遞增 openapi server 索引
                 elif server_type == "external":
                     tools = await self._connect_external_server(server_config, stack)
                 else:

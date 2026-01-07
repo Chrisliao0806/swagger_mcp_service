@@ -14,8 +14,9 @@ from urllib.parse import urljoin, urlparse
 class OpenAPIParser:
     """解析 OpenAPI 規格並生成 MCP Tool 定義"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, server_index: int = 0):
         self.config = config
+        self.server_index = server_index
         self.openapi_spec: dict = {}
 
         # 支援新格式 mcp_servers 和舊格式 api
@@ -25,11 +26,14 @@ class OpenAPIParser:
 
     def _get_api_config(self) -> dict:
         """取得 API 配置（支援新舊格式）"""
-        # 新格式：從 mcp_servers 中找第一個 openapi 類型的 server
+        # 新格式：從 mcp_servers 中找指定索引的 openapi 類型的 server
         if "mcp_servers" in self.config:
-            for server in self.config["mcp_servers"]:
-                if server.get("type") == "openapi" and server.get("enabled", True):
-                    return server.get("openapi", {})
+            openapi_servers = [
+                server for server in self.config["mcp_servers"]
+                if server.get("type") == "openapi" and server.get("enabled", True)
+            ]
+            if openapi_servers and self.server_index < len(openapi_servers):
+                return openapi_servers[self.server_index].get("openapi", {})
 
         # 舊格式：直接使用 api 區塊
         return self.config.get("api", {})

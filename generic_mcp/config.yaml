@@ -17,7 +17,33 @@ mcp_servers:
   # --------------------------------------------------
   # OpenAPI/Swagger 類型的 MCP Server
   # --------------------------------------------------
-  - name: "採購系統 API"
+  - name: "天氣查詢 API"
+    type: "openapi"  # openapi 類型會自動啟動內建的 server.py
+    enabled: true   # 設為 false 可暫時停用此 server（需要先啟動 API server）
+    
+    # OpenAPI 相關設定
+    openapi:
+      # OpenAPI/Swagger 規格來源（二選一）
+      # 方式一：直接從 URL 讀取 OpenAPI JSON
+      openapi_url: "https://opendata.cwa.gov.tw/dist/opendata-swagger.html"
+      
+      # 方式二：從本地檔案讀取（若設定此項，會優先使用）
+      # openapi_file: "./openapi.json"
+      
+      # API 基礎 URL（若 OpenAPI 規格中未定義，則使用此值）
+      base_url: "https://opendata.cwa.gov.tw/api"
+      
+      # 請求超時時間（秒）
+      timeout: 30
+    
+    # Tool 生成設定
+    tool_generation:
+      include_all: true
+      exclude_endpoints: []
+      snake_case_names: true
+      simplified_names: true
+
+  - name: "採購助手 API"
     type: "openapi"  # openapi 類型會自動啟動內建的 server.py
     enabled: true   # 設為 false 可暫時停用此 server（需要先啟動 API server）
     
