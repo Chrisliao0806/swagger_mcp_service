@@ -1,25 +1,32 @@
 """
 Generic MCP Client
-自動從設定檔生成 System Prompt，並連接到 MCP Server
-無需任何客製化
+支援多種 MCP Server：OpenAPI/Swagger + 第三方 MCP Server
+自動從設定檔生成 System Prompt，並連接到多個 MCP Server
 """
 
 import asyncio
 import os
 import sys
+import logging
 from pathlib import Path
+from typing import List, Dict, Any, Optional
+from contextlib import AsyncExitStack
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_mcp import MCPToolkit
-from langchain.agents import create_agent
+from langgraph.prebuilt import create_react_agent
+from langchain_core.messages import SystemMessage, HumanMessage
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from openapi_parser import OpenAPIParser, load_config
 
+# 抑制 MCP client 的 JSONRPC 解析警告（第三方 server 可能產生）
+logging.getLogger("mcp.client.stdio").setLevel(logging.ERROR)
+
 
 class GenericMCPClient:
-    """通用 MCP Client - 從設定檔自動生成 System Prompt"""
+    """通用 MCP Client - 支援多種 MCP Server"""
 
     def __init__(self, config_path: str = None):
         """
@@ -35,41 +42,105 @@ class GenericMCPClient:
         self.config = load_config(config_path)
         self.config_path = config_path or str(Path(__file__).parent / "config.yaml")
 
-        # 解析 OpenAPI（用於生成 System Prompt）
-        self.parser = OpenAPIParser(self.config)
-        self.parsed_spec = self.parser.parse()
+        # 解析 MCP servers 設定
+        self.mcp_servers = self._parse_mcp_servers()
 
-        # 生成 System Prompt
-        self.system_prompt = self._generate_system_prompt()
+        # 儲存連接資訊（用於生成 system prompt）
+        self.connected_servers: List[Dict[str, Any]] = []
+        self.openapi_tools_summary: str = ""
+
+    def _parse_mcp_servers(self) -> List[Dict[str, Any]]:
+        """解析 MCP servers 設定"""
+        servers = []
+
+        # 新格式：mcp_servers 列表
+        if "mcp_servers" in self.config:
+            for server_config in self.config["mcp_servers"]:
+                if server_config.get("enabled", True):
+                    servers.append(server_config)
+
+        # 向後兼容：舊格式（單一 OpenAPI server）
+        elif "api" in self.config:
+            servers.append(
+                {
+                    "name": self.config.get("mcp_server", {}).get("name", "API"),
+                    "type": "openapi",
+                    "enabled": True,
+                    "openapi": self.config["api"],
+                    "tool_generation": self.config.get("tool_generation", {}),
+                }
+            )
+
+        return servers
+
+    def _build_openapi_config(self, server_config: Dict[str, Any]) -> Dict[str, Any]:
+        """為 OpenAPI server 建構完整設定"""
+        openapi_config = server_config.get("openapi", {})
+        tool_gen_config = server_config.get("tool_generation", {})
+
+        return {
+            "api": openapi_config,
+            "mcp_server": {
+                "name": server_config.get("name", "API"),
+                "description": server_config.get("description", ""),
+            },
+            "tool_generation": tool_gen_config,
+        }
 
     def _generate_system_prompt(self) -> str:
-        """根據設定檔和 OpenAPI 規格生成 System Prompt"""
-        api_info = self.parsed_spec["api_info"]
-        tools = self.parsed_spec["tools"]
+        """根據已連接的 servers 生成 System Prompt"""
+        # 生成 servers 資訊
+        servers_info_lines = []
+        for server in self.connected_servers:
+            servers_info_lines.append(
+                f"- {server['name']}: {server.get('description', '已連接')}"
+            )
+        servers_info = "\n".join(servers_info_lines) if servers_info_lines else "無"
 
         # 生成工具摘要
-        tools_summary = self.parser.generate_tools_summary(tools)
+        tools_summary_parts = []
+
+        # OpenAPI 工具摘要
+        if self.openapi_tools_summary:
+            tools_summary_parts.append(self.openapi_tools_summary)
+
+        # 第三方 server 工具描述
+        for server in self.connected_servers:
+            if server.get("type") == "external" and server.get("tools_description"):
+                tools_summary_parts.append(
+                    f"\n### {server['name']}\n{server['tools_description']}"
+                )
+
+        tools_summary = (
+            "\n".join(tools_summary_parts)
+            if tools_summary_parts
+            else "（工具將在連接後顯示）"
+        )
 
         # 取得 prompt template
         prompt_config = self.config.get("system_prompt", {})
         template = prompt_config.get("template", self._get_default_template())
 
+        # 取得主要 API 資訊（向後兼容）
+        api_name = self.config.get("mcp_server", {}).get("name", "MCP Assistant")
+        api_description = self.config.get("mcp_server", {}).get("description", "")
+
         # 替換變數
         prompt = template.format(
-            api_name=api_info.get("title", "API"),
-            api_description=api_info.get("description", ""),
+            api_name=api_name,
+            api_description=api_description,
             tools_summary=tools_summary,
+            servers_info=servers_info,
         )
 
         return prompt
 
     def _get_default_template(self) -> str:
         """預設的 System Prompt 模板"""
-        return """你是一個專業的 AI 助手，可以透過以下 API 工具協助使用者完成任務。
+        return """你是一個專業的 AI 助手，可以透過以下工具協助使用者完成任務。
 
-## 🎯 系統資訊
-- API 名稱：{api_name}
-- 描述：{api_description}
+## 🎯 已連接的服務
+{servers_info}
 
 ## 🛠️ 可用工具
 {tools_summary}
@@ -92,6 +163,7 @@ class GenericMCPClient:
 1. **資料不存在**：查詢無結果時，清楚說明「查無資料」而非編造
 2. **API 錯誤**：若 success=false，顯示 error 訊息並建議用戶稍後再試
 3. **確認操作**：執行寫入操作前，確認用戶意圖
+4. **組合使用**：可以組合多個工具來完成複雜任務
 
 開始為用戶提供服務吧！"""
 
@@ -111,96 +183,255 @@ class GenericMCPClient:
         else:
             raise ValueError(f"不支援的 LLM provider: {provider}")
 
+    def _expand_env_vars(self, value: Any) -> Any:
+        """展開環境變數"""
+        if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+            env_var = value[2:-1]
+            return os.getenv(env_var, "")
+        return value
+
+    async def _connect_openapi_server(
+        self, server_config: Dict[str, Any], stack: AsyncExitStack
+    ) -> Optional[List]:
+        """連接 OpenAPI 類型的 MCP Server"""
+        server_name = server_config.get("name", "OpenAPI Server")
+
+        try:
+            # 建構設定並解析 OpenAPI
+            openapi_config = self._build_openapi_config(server_config)
+            parser = OpenAPIParser(openapi_config)
+            parsed_spec = parser.parse()
+
+            # 生成工具摘要
+            tools = parsed_spec["tools"]
+            self.openapi_tools_summary = parser.generate_tools_summary(tools)
+
+            # 啟動內建的 server.py
+            server_path = str(Path(__file__).parent / "server.py")
+
+            # 建立臨時設定檔路徑（使用原始設定）
+            server_params = StdioServerParameters(
+                command="python",
+                args=[server_path, self.config_path],
+            )
+
+            # 建立連線
+            transport = await stack.enter_async_context(stdio_client(server_params))
+            read, write = transport
+
+            session = await stack.enter_async_context(ClientSession(read, write))
+            await session.initialize()
+
+            # 獲取工具
+            toolkit = MCPToolkit(session=session)
+            await toolkit.initialize()
+            tools = toolkit.get_tools()
+
+            # 記錄連接資訊
+            api_info = parsed_spec.get("api_info", {})
+            self.connected_servers.append(
+                {
+                    "name": server_name,
+                    "type": "openapi",
+                    "description": api_info.get("description", "OpenAPI 服務"),
+                    "tool_count": len(tools),
+                }
+            )
+
+            return tools
+
+        except Exception as e:
+            print(f"   ⚠️  連接失敗: {str(e)}")
+            return None
+
+    async def _connect_external_server(
+        self, server_config: Dict[str, Any], stack: AsyncExitStack
+    ) -> Optional[List]:
+        """連接外部 MCP Server"""
+        server_name = server_config.get("name", "External Server")
+
+        try:
+            command = server_config.get("command")
+            args = server_config.get("args", [])
+            env = server_config.get("env", {})
+
+            # 展開環境變數
+            expanded_env = {k: self._expand_env_vars(v) for k, v in env.items()}
+
+            # 合併當前環境變數
+            full_env = {**os.environ, **expanded_env} if expanded_env else None
+
+            server_params = StdioServerParameters(
+                command=command,
+                args=args,
+                env=full_env,
+            )
+
+            # 建立連線
+            transport = await stack.enter_async_context(stdio_client(server_params))
+            read, write = transport
+
+            session = await stack.enter_async_context(ClientSession(read, write))
+            await session.initialize()
+
+            # 獲取工具
+            toolkit = MCPToolkit(session=session)
+            await toolkit.initialize()
+            tools = toolkit.get_tools()
+
+            # 記錄連接資訊
+            self.connected_servers.append(
+                {
+                    "name": server_name,
+                    "type": "external",
+                    "description": server_config.get("description", "外部 MCP 服務"),
+                    "tools_description": server_config.get("tools_description", ""),
+                    "tool_count": len(tools),
+                }
+            )
+
+            return tools
+
+        except Exception as e:
+            print(f"   ⚠️  連接失敗: {str(e)}")
+            return None
+
     async def run(self):
         """啟動 Client 互動迴圈"""
-        # 取得 server.py 的路徑
-        server_path = str(Path(__file__).parent / "server.py")
+        async with AsyncExitStack() as stack:
+            all_tools = []
 
-        # MCP Server 連線配置
-        server_params = StdioServerParameters(
-            command="python",
-            args=[server_path, self.config_path],
-        )
+            print("\n🔌 正在連接 MCP Servers...")
+            print("-" * 40)
 
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                # 初始化 session
-                await session.initialize()
+            # 連接所有啟用的 MCP servers
+            for server_config in self.mcp_servers:
+                server_name = server_config.get("name", "Unknown")
+                server_type = server_config.get("type", "unknown")
 
-                # 建立 MCPToolkit
-                toolkit = MCPToolkit(session=session)
-                await toolkit.initialize()
-                tools = toolkit.get_tools()
+                print(f"   📡 {server_name} ({server_type})...")
 
-                # 建立 LLM
-                llm = self._get_llm()
+                tools = None
+                if server_type == "openapi":
+                    tools = await self._connect_openapi_server(server_config, stack)
+                elif server_type == "external":
+                    tools = await self._connect_external_server(server_config, stack)
+                else:
+                    print(f"   ⚠️  不支援的 server 類型: {server_type}")
+                    continue
 
-                # 建立 Agent
-                agent = create_agent(llm, tools, system_prompt=self.system_prompt)
+                if tools:
+                    all_tools.extend(tools)
+                    print(f"   ✅ 已連接，載入 {len(tools)} 個工具")
 
-                # 顯示歡迎訊息
-                api_info = self.parsed_spec["api_info"]
-                self._print_welcome(api_info)
+            print("-" * 40)
 
-                # 維護對話歷史
-                messages = []
+            if not all_tools:
+                print("\n❌ 沒有可用的工具，請檢查設定檔或確認服務是否正常運行")
+                return
 
-                while True:
-                    try:
-                        user_input = input("\n👤 您：").strip()
+            print(f"📦 總共載入 {len(all_tools)} 個工具\n")
 
-                        if not user_input:
-                            continue
+            # 生成 System Prompt
+            system_prompt = self._generate_system_prompt()
 
-                        if user_input.lower() in [
-                            "quit",
-                            "exit",
-                            "bye",
-                            "結束",
-                            "離開",
-                        ]:
-                            print("\n👋 感謝使用，再見！")
-                            break
+            # 建立 LLM 和 Agent
+            llm = self._get_llm()
+            agent = create_react_agent(llm, all_tools)
 
-                        # 加入使用者訊息
-                        messages.append({"role": "user", "content": user_input})
+            # 顯示歡迎訊息
+            self._print_welcome()
 
-                        # 呼叫 agent
-                        result = await agent.ainvoke({"messages": messages})
+            # 維護對話歷史
+            messages = [SystemMessage(content=system_prompt)]
 
-                        # 取得回覆
-                        response = result["messages"][-1].content
+            while True:
+                try:
+                    user_input = input("\n👤 您：").strip()
 
-                        # 加入助手回覆到歷史
-                        messages.append({"role": "assistant", "content": response})
+                    if not user_input:
+                        continue
 
-                        print(f"\n🤖 助手：\n{response}")
-                        print("-" * 60)
-
-                    except KeyboardInterrupt:
-                        print("\n\n👋 感謝使用，再見！")
+                    if user_input.lower() in ["quit", "exit", "bye", "結束", "離開"]:
+                        print("\n👋 感謝使用，再見！")
                         break
-                    except Exception as e:
-                        print(f"\n❌ 發生錯誤：{str(e)}\n")
 
-    def _print_welcome(self, api_info: dict):
+                    if user_input.lower() == "tools":
+                        self._print_tools(all_tools)
+                        continue
+
+                    if user_input.lower() == "servers":
+                        self._print_servers()
+                        continue
+
+                    # 加入使用者訊息
+                    messages.append(HumanMessage(content=user_input))
+
+                    # 呼叫 agent
+                    result = await agent.ainvoke({"messages": messages})
+
+                    # 取得回覆
+                    response_messages = result["messages"]
+                    response = response_messages[-1].content
+
+                    # 更新對話歷史
+                    messages = response_messages
+
+                    print(f"\n🤖 助手：\n{response}")
+                    print("-" * 60)
+
+                except KeyboardInterrupt:
+                    print("\n\n👋 感謝使用，再見！")
+                    break
+                except Exception as e:
+                    print(f"\n❌ 發生錯誤：{str(e)}\n")
+
+    def _print_welcome(self):
         """顯示歡迎訊息"""
-        title = api_info.get("title", "API Assistant")
-        description = api_info.get("description", "")
+        title = self.config.get("mcp_server", {}).get("name", "MCP Assistant")
 
         print("=" * 60)
         print(f"🤖 {title}")
         print("=" * 60)
 
-        if description:
-            # 只取描述的前幾行
-            desc_lines = description.strip().split("\n")[:3]
-            for line in desc_lines:
-                print(f"   {line.strip()}")
+        # 顯示已連接的 servers
+        if self.connected_servers:
+            print("📡 已連接的服務:")
+            for server in self.connected_servers:
+                print(f"   • {server['name']} ({server['tool_count']} 個工具)")
 
         print("-" * 60)
-        print("💡 輸入 'quit' 或 'exit' 結束對話")
+        print("💡 指令說明:")
+        print("   • 輸入 'quit' 或 'exit' 結束對話")
+        print("   • 輸入 'tools' 查看所有可用工具")
+        print("   • 輸入 'servers' 查看已連接的服務")
         print("=" * 60)
+
+    def _print_tools(self, tools: List):
+        """顯示所有可用工具"""
+        print("\n📋 可用工具列表:")
+        print("-" * 40)
+        for tool in tools:
+            desc = (
+                tool.description[:60] + "..."
+                if len(tool.description) > 60
+                else tool.description
+            )
+            print(f"   • {tool.name}")
+            print(f"     {desc}")
+        print("-" * 40)
+
+    def _print_servers(self):
+        """顯示已連接的 servers"""
+        print("\n📡 已連接的 MCP Servers:")
+        print("-" * 40)
+        for server in self.connected_servers:
+            print(f"   • {server['name']}")
+            print(f"     類型: {server['type']}")
+            print(f"     工具數: {server['tool_count']}")
+            if server.get("description"):
+                print(f"     描述: {server['description'][:50]}...")
+        print("-" * 40)
 
 
 async def main():

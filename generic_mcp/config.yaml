@@ -1,84 +1,141 @@
 # ========================================
 # Generic MCP Service Configuration
 # ========================================
-# 只需要修改此檔案，即可將任何 OpenAPI/Swagger API 轉換為 MCP Service
-# 無需修改任何程式碼
+# 支援多種 MCP Server：
+# 1. OpenAPI/Swagger 自動生成的 MCP Server
+# 2. 第三方 MCP Server（如 mcp-server-fetch）
+# 3. 自定義 MCP Server
 
-# API 設定
-api:
-  # OpenAPI/Swagger 規格來源（二選一）
-  # 方式一：直接從 URL 讀取 OpenAPI JSON
-  # 支援以下 URL 類型：
-  #   - 直接的 OpenAPI JSON: "http://localhost:8000/openapi.json"
-  #   - Swagger UI 頁面: "http://localhost:8000/docs" (會自動提取 OpenAPI spec)
-  #   - ReDoc 頁面: "http://localhost:8000/redoc" (會自動提取 OpenAPI spec)
-  openapi_url: "http://localhost:8000/openapi.json"
-  #openapi_url: "https://opendata.cwa.gov.tw/dist/opendata-swagger.html"
-  
-  # 方式二：從本地檔案讀取（若設定此項，會優先使用）
-  # openapi_file: "./openapi.json"
-  
-  # API 基礎 URL（若 OpenAPI 規格中未定義，則使用此值）
-  base_url: "http://localhost:8000"
-  #base_url: "https://opendata.cwa.gov.tw/api"
-  
-  # 請求超時時間（秒）
-  timeout: 30
+# ========================================
+# MCP Servers 設定
+# ========================================
+# 可以配置多個 MCP Server，Client 會同時連接所有啟用的 server
+mcp_servers:
+  # --------------------------------------------------
+  # OpenAPI/Swagger 類型的 MCP Server
+  # --------------------------------------------------
+  - name: "採購系統 API"
+    type: "openapi"  # openapi 類型會自動啟動內建的 server.py
+    enabled: true   # 設為 false 可暫時停用此 server（需要先啟動 API server）
+    
+    # OpenAPI 相關設定
+    openapi:
+      # OpenAPI/Swagger 規格來源（二選一）
+      # 方式一：直接從 URL 讀取 OpenAPI JSON
+      openapi_url: "http://localhost:8000/openapi.json"
+      
+      # 方式二：從本地檔案讀取（若設定此項，會優先使用）
+      # openapi_file: "./openapi.json"
+      
+      # API 基礎 URL（若 OpenAPI 規格中未定義，則使用此值）
+      base_url: "http://localhost:8000"
+      
+      # 請求超時時間（秒）
+      timeout: 30
+    
+    # Tool 生成設定
+    tool_generation:
+      include_all: true
+      exclude_endpoints: []
+      snake_case_names: true
+      simplified_names: true
 
-# MCP Server 設定
+  # --------------------------------------------------
+  # 第三方 MCP Server：mcp-server-fetch
+  # --------------------------------------------------
+  - name: "Fetch (網頁獲取)"
+    type: "external"  # external 類型表示外部 MCP Server
+    enabled: true
+    
+    # 執行命令設定
+    command: "uvx"
+    args: ["mcp-server-fetch"]
+    # 如果用 pip 安裝的，改用：
+    # command: "python"
+    # args: ["-m", "mcp_server_fetch"]
+    
+    # 工具描述（用於 System Prompt）
+    description: "從網頁獲取內容並轉換為 markdown"
+    tools_description: |
+      - **fetch**: 從指定 URL 獲取網頁內容
+        - url (必填): 要獲取的網址
+        - max_length (可選): 返回的最大字元數，預設 5000
+        - start_index (可選): 從第幾個字元開始，預設 0
+        - raw (可選): 是否返回原始內容，預設 false
+
+  # --------------------------------------------------
+  # 更多第三方 MCP Server 範例（預設停用）
+  # --------------------------------------------------
+  # - name: "Filesystem"
+  #   type: "external"
+  #   enabled: false
+  #   command: "npx"
+  #   args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]
+  #   description: "存取本地檔案系統"
+
+  # - name: "GitHub"
+  #   type: "external"
+  #   enabled: false
+  #   command: "npx"
+  #   args: ["-y", "@modelcontextprotocol/server-github"]
+  #   env:
+  #     GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+  #   description: "存取 GitHub 倉庫"
+
+  # - name: "Brave Search"
+  #   type: "external"
+  #   enabled: false
+  #   command: "npx"
+  #   args: ["-y", "@modelcontextprotocol/server-brave-search"]
+  #   env:
+  #     BRAVE_API_KEY: "${BRAVE_API_KEY}"
+  #   description: "使用 Brave 搜尋引擎"
+
+# ========================================
+# MCP Server 設定（向後兼容舊格式）
+# ========================================
 mcp_server:
-  # Server 名稱（會顯示在 MCP client 中）
   name: "採購系統 API"
-  
-  # Server 描述
   description: "企業採購管理系統 MCP Service - 自動從 OpenAPI 規格生成"
 
-# Tool 生成設定
+# ========================================
+# API 設定（向後兼容，供 server.py 使用）
+# ========================================
+api:
+  openapi_url: "http://localhost:8000/openapi.json"
+  base_url: "http://localhost:8000"
+  timeout: 30
+
+# Tool 生成設定（向後兼容）
 tool_generation:
-  # 是否包含所有 API endpoints（預設為 true）
   include_all: true
-  
-  # 若 include_all 為 false，可指定要包含的 endpoints（使用 operationId 或 path）
-  # include_endpoints:
-  #   - "get_purchase_history"
-  #   - "/api/inventory"
-  
-  # 要排除的 endpoints（支援 operationId 或 path pattern）
   exclude_endpoints: []
-  
-  # Tool 名稱前綴（可選）
-  # tool_prefix: "procurement_"
-  
-  # 是否將 operationId 轉換為 snake_case
   snake_case_names: true
-  
-  # 是否使用簡化的 tool 名稱（移除 _api_ 和 HTTP method 後綴）
   simplified_names: true
 
-# LLM 設定（用於 client）
+# ========================================
+# LLM 設定
+# ========================================
 llm:
-  # 模型提供者
-  provider: "openai"  # 支援: openai, azure, anthropic
-  
-  # 模型名稱
+  provider: "openai"
   model: "gpt-4.1-mini"
-  
-  # Temperature
   temperature: 0
 
+# ========================================
 # System Prompt 設定
+# ========================================
 system_prompt:
   # 可以使用以下變數：
-  # {api_name} - API 名稱
+  # {api_name} - 主要 API 名稱
   # {api_description} - API 描述
-  # {tools_summary} - 自動生成的工具摘要
+  # {tools_summary} - 自動生成的工具摘要（包含所有 MCP server 的工具）
+  # {servers_info} - 已連接的 MCP Server 資訊
   
   template: |
-    你是一個專業的 AI 助手，可以透過以下 API 工具協助使用者完成任務。
+    你是一個專業的 AI 助手，可以透過多種工具協助使用者完成任務。
 
     ## 🎯 系統資訊
-    - API 名稱：{api_name}
-    - 描述：{api_description}
+    {servers_info}
 
     ## 🛠️ 可用工具
     {tools_summary}
@@ -117,19 +174,18 @@ system_prompt:
     1. **資料不存在**：查詢無結果時，清楚說明「查無資料」而非編造
     2. **API 錯誤**：若 success=false，顯示 error 訊息並建議用戶稍後再試
     3. **確認操作**：執行寫入操作前，確認用戶意圖
+    4. **組合使用**：可以組合多個工具來完成複雜任務
 
     開始為用戶提供服務吧！
 
+# ========================================
 # 進階設定
+# ========================================
 advanced:
-  # 是否啟用除錯模式
   debug: false
-  
-  # 自動重試次數
   retry_count: 3
-  
-  # 是否快取 OpenAPI 規格
   cache_openapi: true
-  
-  # 快取過期時間（秒）
   cache_ttl: 3600
+  
+  # 是否抑制第三方 MCP Server 的警告訊息
+  suppress_external_warnings: true
