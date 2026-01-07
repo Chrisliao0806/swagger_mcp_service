@@ -96,28 +96,6 @@ mcp_servers:
   #   description: "使用 Brave 搜尋引擎"
 
 # ========================================
-# MCP Server 設定（向後兼容舊格式）
-# ========================================
-mcp_server:
-  name: "採購系統 API"
-  description: "企業採購管理系統 MCP Service - 自動從 OpenAPI 規格生成"
-
-# ========================================
-# API 設定（向後兼容，供 server.py 使用）
-# ========================================
-api:
-  openapi_url: "http://localhost:8000/openapi.json"
-  base_url: "http://localhost:8000"
-  timeout: 30
-
-# Tool 生成設定（向後兼容）
-tool_generation:
-  include_all: true
-  exclude_endpoints: []
-  snake_case_names: true
-  simplified_names: true
-
-# ========================================
 # LLM 設定
 # ========================================
 llm:

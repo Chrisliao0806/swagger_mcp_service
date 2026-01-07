@@ -3,15 +3,15 @@ Generic MCP Server
 自動從 OpenAPI 規格生成 MCP Tools，無需任何客製化
 
 ================================================================================
-MCP Tool 程式碼結構說明 
+MCP Tool 程式碼結構說明
 ================================================================================
 
 一個標準的 MCP Tool 定義如下：
 
     from mcp.server.fastmcp import FastMCP
-    
+
     mcp = FastMCP("My Server")
-    
+
     @mcp.tool()
     def my_tool_name(
         required_param: str,           # 必填參數
@@ -19,7 +19,7 @@ MCP Tool 程式碼結構說明
     ) -> str:
         \"\"\"
         工具的描述說明 (這會顯示給 LLM 看，讓它知道何時該使用這個工具)
-        
+
         Args:
             required_param: 必填參數的說明
             optional_param: 選填參數的說明
@@ -40,7 +40,7 @@ MCP Tool 程式碼結構說明
    operationId / 路徑+方法         →  tool 名稱 (函數名)
    summary / description          →  tool 描述 (docstring)
    path parameters                →  必填參數 (in="path")
-   query parameters               →  查詢參數 (in="query") 
+   query parameters               →  查詢參數 (in="query")
    request body properties        →  請求體參數
 
 3. 動態生成的工具函數會：
@@ -66,7 +66,7 @@ MCP Tool 程式碼結構說明
         items: list
     ) -> str:
         \"\"\"建立採購單
-        
+
         Args:
             supplier_name: 供應商名稱
             items: 採購項目
@@ -75,6 +75,7 @@ MCP Tool 程式碼結構說明
 
 ================================================================================
 """
+
 import sys
 import json
 import logging
@@ -113,21 +114,50 @@ class GenericMCPServer:
         self.api_info = self.parsed_spec["api_info"]
         self.base_url = self.parsed_spec["base_url"]
         self.tools_def = self.parsed_spec["tools"]
-        self.timeout = self.config.get("api", {}).get("timeout", 30)
+        self.timeout = self._get_timeout()
 
-        logger.info("API 資訊: %s (版本: %s)", self.api_info["title"], self.api_info.get("version", "未知"))
+        logger.info(
+            "API 資訊: %s (版本: %s)",
+            self.api_info["title"],
+            self.api_info.get("version", "未知"),
+        )
         logger.info("Base URL: %s", self.base_url)
         logger.info("Timeout: %s 秒", self.timeout)
 
         # 建立 MCP Server
-        server_config = self.config.get("mcp_server", {})
-        server_name = server_config.get("name", self.api_info["title"])
+        server_name = self._get_server_name()
 
         self.mcp = FastMCP(server_name)
         logger.info("MCP Server 已建立: %s", server_name)
 
         # 動態註冊所有工具
         self._register_tools()
+
+    def _get_api_config(self) -> dict:
+        """取得 API 配置（支援新舊格式）"""
+        # 新格式：從 mcp_servers 中找第一個 openapi 類型的 server
+        if "mcp_servers" in self.config:
+            for server in self.config["mcp_servers"]:
+                if server.get("type") == "openapi" and server.get("enabled", True):
+                    return server.get("openapi", {})
+
+        # 舊格式：直接使用 api 區塊
+        return self.config.get("api", {})
+
+    def _get_timeout(self) -> int:
+        """取得 timeout 設定"""
+        return self._get_api_config().get("timeout", 30)
+
+    def _get_server_name(self) -> str:
+        """取得 server 名稱"""
+        # 新格式：從 mcp_servers 取得
+        if "mcp_servers" in self.config:
+            for server in self.config["mcp_servers"]:
+                if server.get("type") == "openapi" and server.get("enabled", True):
+                    return server.get("name", self.api_info["title"])
+
+        # 舊格式：從 mcp_server 取得
+        return self.config.get("mcp_server", {}).get("name", self.api_info["title"])
 
     def _call_api(
         self,
@@ -173,7 +203,10 @@ class GenericMCPServer:
                     response = client.delete(url, params=query_params)
                 else:
                     logger.warning("不支援的 HTTP 方法: %s", method)
-                    return {"success": False, "error": "不支援的 HTTP 方法: %s" % method}
+                    return {
+                        "success": False,
+                        "error": "不支援的 HTTP 方法: %s" % method,
+                    }
 
                 response.raise_for_status()
                 logger.debug("API 回應狀態碼: %s", response.status_code)
@@ -412,7 +445,9 @@ def {name}({params_str}) -> str:
             logging.basicConfig(level=logging.DEBUG)
             logger.debug("已載入 %d 個工具", len(self.tools_def))
             for tool in self.tools_def:
-                logger.debug("  - %s (%s %s)", tool["name"], tool["method"], tool["path"])
+                logger.debug(
+                    "  - %s (%s %s)", tool["name"], tool["method"], tool["path"]
+                )
         else:
             logging.basicConfig(level=logging.INFO)
 

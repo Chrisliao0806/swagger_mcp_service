@@ -17,12 +17,26 @@ class OpenAPIParser:
     def __init__(self, config: dict):
         self.config = config
         self.openapi_spec: dict = {}
-        self.base_url: str = config.get("api", {}).get("base_url", "")
-        self.timeout: int = config.get("api", {}).get("timeout", 30)
+
+        # 支援新格式 mcp_servers 和舊格式 api
+        api_config = self._get_api_config()
+        self.base_url: str = api_config.get("base_url", "")
+        self.timeout: int = api_config.get("timeout", 30)
+
+    def _get_api_config(self) -> dict:
+        """取得 API 配置（支援新舊格式）"""
+        # 新格式：從 mcp_servers 中找第一個 openapi 類型的 server
+        if "mcp_servers" in self.config:
+            for server in self.config["mcp_servers"]:
+                if server.get("type") == "openapi" and server.get("enabled", True):
+                    return server.get("openapi", {})
+
+        # 舊格式：直接使用 api 區塊
+        return self.config.get("api", {})
 
     def load_spec(self) -> dict:
         """載入 OpenAPI 規格（從 URL 或檔案）"""
-        api_config = self.config.get("api", {})
+        api_config = self._get_api_config()
 
         # 優先從本地檔案載入
         if openapi_file := api_config.get("openapi_file"):
