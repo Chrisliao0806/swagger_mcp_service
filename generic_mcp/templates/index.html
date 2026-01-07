@@ -142,6 +142,12 @@
             border-color: var(--border-color);
         }
 
+        .server-header {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
         .server-name {
             font-weight: 500;
             font-size: 0.9rem;
@@ -158,9 +164,53 @@
             background: var(--success-color);
         }
 
-        .server-tools {
+        .server-tools-count {
             font-size: 0.75rem;
             color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .expand-icon {
+            transition: transform 0.2s ease;
+            font-size: 0.7rem;
+        }
+
+        .server-item.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .server-tools-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .server-item.expanded .server-tools-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .tool-item {
+            padding: 10px;
+            margin-top: 8px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .tool-name {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--accent-secondary);
+            margin-bottom: 4px;
+        }
+
+        .tool-description {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
         }
 
         .sidebar-footer {
@@ -772,15 +822,32 @@
                     
                     // 更新 server 列表
                     const serverList = document.getElementById('serverList');
-                    serverList.innerHTML = data.servers.map(server => `
-                        <div class="server-item">
-                            <div class="server-name">
-                                <span class="server-status"></span>
-                                ${server.name}
+                    serverList.innerHTML = data.servers.map((server, index) => {
+                        const toolsHtml = (server.tools || []).map(tool => `
+                            <div class="tool-item">
+                                <div class="tool-name">🔧 ${escapeHtml(tool.name)}</div>
+                                <div class="tool-description">${escapeHtml(tool.description || '無描述')}</div>
                             </div>
-                            <div class="server-tools">${server.tool_count} 個工具</div>
-                        </div>
-                    `).join('');
+                        `).join('');
+                        
+                        return `
+                            <div class="server-item" data-index="${index}">
+                                <div class="server-header" onclick="toggleServer(${index})">
+                                    <div class="server-name">
+                                        <span class="server-status"></span>
+                                        ${escapeHtml(server.name)}
+                                    </div>
+                                    <div class="server-tools-count">
+                                        <span>${server.tool_count} 個工具</span>
+                                        <span class="expand-icon">▼</span>
+                                    </div>
+                                </div>
+                                <div class="server-tools-list">
+                                    ${toolsHtml}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
                 } else {
                     document.getElementById('statusText').textContent = '未連接';
                 }
@@ -788,6 +855,21 @@
                 console.error('Status check failed:', err);
                 document.getElementById('statusText').textContent = '連線失敗';
             }
+        }
+
+        // 切換 server 展開/收合
+        function toggleServer(index) {
+            const serverItem = document.querySelector(`.server-item[data-index="${index}"]`);
+            if (serverItem) {
+                serverItem.classList.toggle('expanded');
+            }
+        }
+
+        // HTML 轉義函數
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // 建立 session

@@ -353,12 +353,21 @@ class MCPWebServer:
             tools = toolkit.get_tools()
 
             api_info = parsed_spec.get("api_info", {})
+            # 收集工具詳情
+            tools_info = [
+                {
+                    "name": tool.name,
+                    "description": tool.description[:300] if tool.description else ""
+                }
+                for tool in tools
+            ]
             self.connected_servers.append(
                 {
                     "name": server_name,
                     "type": "openapi",
                     "description": api_info.get("description", "OpenAPI 服務"),
                     "tool_count": len(tools),
+                    "tools": tools_info,
                 }
             )
             
@@ -401,12 +410,21 @@ class MCPWebServer:
             await toolkit.initialize()
             tools = toolkit.get_tools()
 
+            # 收集工具詳情
+            tools_info = [
+                {
+                    "name": tool.name,
+                    "description": tool.description[:300] if tool.description else ""
+                }
+                for tool in tools
+            ]
             self.connected_servers.append(
                 {
                     "name": server_name,
                     "type": "external",
                     "description": server_config.get("description", "外部 MCP 服務"),
                     "tool_count": len(tools),
+                    "tools": tools_info,
                 }
             )
 
