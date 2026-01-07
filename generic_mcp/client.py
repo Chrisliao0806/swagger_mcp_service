@@ -279,13 +279,25 @@ class GenericMCPClient:
             await toolkit.initialize()
             tools = toolkit.get_tools()
 
+            # 自動從 MCP server 獲取工具描述（如果 config 沒有提供）
+            auto_description = server_config.get("description", "")
+            auto_tools_description = server_config.get("tools_description", "")
+
+            if not auto_tools_description and tools:
+                # 自動生成工具描述
+                auto_tools_description = self._generate_tools_description_from_mcp(tools)
+
+            if not auto_description and tools:
+                # 使用第一個工具的描述作為 server 描述（簡化版）
+                auto_description = f"提供 {len(tools)} 個工具"
+
             # 記錄連接資訊
             self.connected_servers.append(
                 {
                     "name": server_name,
                     "type": "external",
-                    "description": server_config.get("description", "外部 MCP 服務"),
-                    "tools_description": server_config.get("tools_description", ""),
+                    "description": auto_description or "外部 MCP 服務",
+                    "tools_description": auto_tools_description,
                     "tool_count": len(tools),
                 }
             )
@@ -295,6 +307,40 @@ class GenericMCPClient:
         except Exception as e:
             print(f"   ⚠️  連接失敗: {str(e)}")
             return None
+
+    def _generate_tools_description_from_mcp(self, tools: List) -> str:
+        """從 MCP 工具列表自動生成工具描述"""
+        lines = []
+        for tool in tools:
+            tool_name = tool.name
+            tool_desc = tool.description or "無描述"
+            # 取描述的第一行
+            first_line = tool_desc.split("\n")[0][:100]
+            lines.append(f"- **{tool_name}**: {first_line}")
+
+            # 嘗試從 tool.args_schema 獲取參數資訊
+            if hasattr(tool, "args_schema") and tool.args_schema:
+                try:
+                    schema = tool.args_schema
+                    if hasattr(schema, "model_fields"):
+                        # Pydantic v2
+                        for field_name, field_info in schema.model_fields.items():
+                            required = "(必填)" if field_info.is_required() else "(可選)"
+                            field_desc = field_info.description or ""
+                            lines.append(f"  - {field_name} {required}: {field_desc}")
+                    elif hasattr(schema, "schema"):
+                        # 嘗試從 JSON schema 獲取
+                        json_schema = schema.schema() if callable(schema.schema) else schema.schema
+                        properties = json_schema.get("properties", {})
+                        required_fields = json_schema.get("required", [])
+                        for prop_name, prop_info in properties.items():
+                            required = "(必填)" if prop_name in required_fields else "(可選)"
+                            prop_desc = prop_info.get("description", "")
+                            lines.append(f"  - {prop_name} {required}: {prop_desc}")
+                except Exception:
+                    pass  # 忽略解析錯誤
+
+        return "\n".join(lines) if lines else ""
 
     async def run(self):
         """啟動 Client 互動迴圈"""

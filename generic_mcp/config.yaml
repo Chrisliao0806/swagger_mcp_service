@@ -5,6 +5,9 @@
 # 1. OpenAPI/Swagger 自動生成的 MCP Server
 # 2. 第三方 MCP Server（如 mcp-server-fetch）
 # 3. 自定義 MCP Server
+#
+# 🆕 新功能：第三方 MCP Server 的 description 和 tools_description
+#    現在會自動從 server 獲取，不需要手動填寫！
 
 # ========================================
 # MCP Servers 設定
@@ -54,14 +57,15 @@ mcp_servers:
     # command: "python"
     # args: ["-m", "mcp_server_fetch"]
     
-    # 工具描述（用於 System Prompt）
-    description: "從網頁獲取內容並轉換為 markdown"
-    tools_description: |
-      - **fetch**: 從指定 URL 獲取網頁內容
-        - url (必填): 要獲取的網址
-        - max_length (可選): 返回的最大字元數，預設 5000
-        - start_index (可選): 從第幾個字元開始，預設 0
-        - raw (可選): 是否返回原始內容，預設 false
+    # 🆕 工具描述現在會自動從 MCP Server 獲取！
+    # 以下欄位變成可選，只有在需要覆蓋自動描述時才需要填寫：
+    # description: "從網頁獲取內容並轉換為 markdown"
+    # tools_description: |
+    #   - **fetch**: 從指定 URL 獲取網頁內容
+    #     - url (必填): 要獲取的網址
+    #     - max_length (可選): 返回的最大字元數，預設 5000
+    #     - start_index (可選): 從第幾個字元開始，預設 0
+    #     - raw (可選): 是否返回原始內容，預設 false
 
   # --------------------------------------------------
   # 更多第三方 MCP Server 範例（預設停用）
