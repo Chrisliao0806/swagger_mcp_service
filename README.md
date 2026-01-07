@@ -26,50 +26,62 @@
 - 🔌 **Multi-Server Support** - Connect to multiple MCP servers simultaneously (OpenAPI + third-party)
 - 🆕 **Auto Tool Discovery** - Automatically fetches tool descriptions from third-party MCP servers
 - 🧩 **Extensible Architecture** - Clean separation between server, client, and parser components
+- 🌐 **Beautiful Web Interface** - Modern chat UI with real-time streaming responses
+- 📊 **Comprehensive Logging** - Colored console logs with performance metrics
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Swagger MCP Service                              │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│   ┌──────────────┐     ┌──────────────┐     ┌──────────────────────┐   │
-│   │   User CLI   │────▶│  MCP Client  │────▶│     LLM (GPT-4)      │   │
-│   │   (run.py)   │     │ (client.py)  │◀────│    via LangChain     │   │
-│   └──────────────┘     └──────┬───────┘     └──────────────────────┘   │
-│                               │                                          │
-│                               │ stdio (multiple connections)             │
-│                    ┌──────────┴──────────┐                               │
-│                    ▼                     ▼                               │
-│            ┌──────────────┐     ┌──────────────────┐                    │
-│            │  MCP Server  │     │  3rd Party MCP   │                    │
-│            │ (server.py)  │     │ (mcp-server-*)   │                    │
-│            └──────┬───────┘     └──────────────────┘                    │
-│                   │                                                      │
-│                   │ Dynamic Tool Registration                            │
-│                   ▼                                                      │
-│         ┌─────────────────────┐                                          │
-│         │   OpenAPI Parser    │                                          │
-│         │ (openapi_parser.py) │                                          │
-│         └─────────┬───────────┘                                          │
-│                   │                                                      │
-│                   │ Parse & Transform                                    │
-│                   ▼                                                      │
-│        ┌──────────────────────┐                                          │
-│        │   OpenAPI/Swagger    │                                          │
-│        │    Specification     │                                          │
-│        └──────────┬───────────┘                                          │
-│                   │                                                      │
-└───────────────────┼──────────────────────────────────────────────────────┘
-                    │ HTTP Requests
-                    ▼
-            ┌──────────────┐
-            │  Target API  │
-            │   Server     │
-            └──────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         Swagger MCP Service                               │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│   ┌─────────────┐        ┌────────────────┐                              │
+│   │   Browser   │───────▶│  Web Interface │  (SSE Streaming)             │
+│   │   /User     │◀───────│ (web_server.py)│                              │
+│   └─────────────┘        └────────┬───────┘                              │
+│                                   │                                       │
+│   ┌─────────────┐                 │                                       │
+│   │     CLI     │────┐            │  FastAPI + LangGraph                  │
+│   │  (run.py)   │    │            │                                       │
+│   └─────────────┘    │            ▼                                       │
+│                      │    ┌──────────────┐     ┌──────────────────────┐  │
+│                      └───▶│  MCP Client  │────▶│     LLM (GPT-4)      │  │
+│                           │ (client.py)  │◀────│    via LangChain     │  │
+│                           └──────┬───────┘     └──────────────────────┘  │
+│                                  │                                        │
+│                                  │ stdio (multiple connections)           │
+│                       ┌──────────┴──────────┐                             │
+│                       ▼                     ▼                             │
+│               ┌──────────────┐     ┌──────────────────┐                  │
+│               │  MCP Server  │     │  3rd Party MCP   │                  │
+│               │ (server.py)  │     │ (mcp-server-*)   │                  │
+│               └──────┬───────┘     └──────────────────┘                  │
+│                      │                                                    │
+│                      │ Dynamic Tool Registration                          │
+│                      ▼                                                    │
+│            ┌─────────────────────┐                                        │
+│            │   OpenAPI Parser    │                                        │
+│            │ (openapi_parser.py) │                                        │
+│            └─────────┬───────────┘                                        │
+│                      │                                                    │
+│                      │ Parse & Transform                                  │
+│                      ▼                                                    │
+│           ┌──────────────────────┐                                        │
+│           │   OpenAPI/Swagger    │                                        │
+│           │    Specification     │                                        │
+│           └──────────┬───────────┘                                        │
+│                      │                                                    │
+└──────────────────────┼────────────────────────────────────────────────────┘
+                       │ HTTP Requests
+                       ▼
+               ┌──────────────┐
+    Web Server** | `web_server.py` | 🌐 Beautiful web chat interface with real-time streaming responses |
+| **           │  Target API  │
+               │   Server     │
+               └──────────────┘
 ```
 
 ### Component Overview
@@ -238,6 +250,7 @@ system_prompt:
 ## 🚀 Usage
 
 ### Quick Start
+#### Option 1: Web Interface (Recommended) 🌐
 
 1. **Start your target API server** (or use the included example):
 
@@ -254,6 +267,45 @@ api:
   base_url: "http://localhost:8000"
 ```
 
+3. **Launch the web server**:
+
+```bash
+cd generic_mcp
+python web_server.py
+```
+
+#### Web Server
+
+```bash
+# Launch web interface with default config
+python web_server.py
+
+# Use custom configuration file
+python web_server.py /path/to/my-config.yaml
+
+# Set custom port (default: 8080)
+export MCP_WEB_PORT=3000
+python web_server.py
+
+# Override LLM model
+export OPENAI_MODEL=gpt-4o
+python web_server.py
+```
+
+#### CLI Client
+
+#### Web Interface
+The web interface provides a beautiful, modern chat experience with:
+- 💬 **Real-time Streaming** - Watch responses generate token by token
+- 🔧 **Tool Call Visualization** - See when and how API tools are invoked
+- 🎨 **Dark Theme** - Easy on the eyes, similar to Claude's interface
+- 📝 **Markdown Support** - Rich formatting with code highlighting
+- 📊 **Session Management** - Multiple conversation contexts
+
+#### CLI Interface
+4. **Open your browser** and visit: http://localhost:8080
+
+#### Option 2: Command-Line Interface
 3. **Run the interactive client**:
 
 ```bash
@@ -290,11 +342,14 @@ python run.py --server-only
 
 👤 You: Show me recent purchase history
 
-🤖 Assistant:
-Here's the recent purchase history:
-
-| ID    | Item            | Quantity | Unit Price | Supplier   |
-|-------|-----------------|----------|------------|------------|
+🤖 Assisweb_server.py            # 🌐 Web chat interface (FastAPI + SSE)
+│   ├── run.py                   # CLI entry point
+│   ├── server.py                # MCP server implementation
+│   ├── client.py                # MCP client with LangChain
+│   ├── openapi_parser.py        # OpenAPI specification parser
+│   ├── config.yaml              # Configuration file
+│   └── templates/
+│       └── index.html           # Web UI templat-----------|
 | PH001 | Laptop (Dell)   | 10       | NT$ 42,000 | Digital Co |
 | PH002 | Laptop (Lenovo) | 5        | NT$ 52,000 | Tech Corp  |
 
@@ -331,6 +386,15 @@ swagger_mcp_service/
     └── api_server.py            # FastAPI demo server
 ```
 
+
+### 4. Web Interface Streaming
+
+The web server uses Server-Sent Events (SSE) for real-time streaming:
+1. **Token Streaming** - LLM responses stream character by character
+2. **Tool Events** - `on_tool_start` and `on_tool_end` events show API calls
+3. **Session Management** - Multiple conversation contexts with unique IDs
+4. **Colored Logging** - Backend logs with timestamps and log levels
+5. **Error Handling** - Graceful error messages displayed in UI
 ---
 
 ## 🔧 How It Works
