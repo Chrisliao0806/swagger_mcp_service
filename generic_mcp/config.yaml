@@ -1,0 +1,135 @@
+# ========================================
+# Generic MCP Service Configuration
+# ========================================
+# 只需要修改此檔案，即可將任何 OpenAPI/Swagger API 轉換為 MCP Service
+# 無需修改任何程式碼
+
+# API 設定
+api:
+  # OpenAPI/Swagger 規格來源（二選一）
+  # 方式一：直接從 URL 讀取 OpenAPI JSON
+  # 支援以下 URL 類型：
+  #   - 直接的 OpenAPI JSON: "http://localhost:8000/openapi.json"
+  #   - Swagger UI 頁面: "http://localhost:8000/docs" (會自動提取 OpenAPI spec)
+  #   - ReDoc 頁面: "http://localhost:8000/redoc" (會自動提取 OpenAPI spec)
+  openapi_url: "http://localhost:8000/openapi.json"
+  #openapi_url: "https://opendata.cwa.gov.tw/dist/opendata-swagger.html"
+  
+  # 方式二：從本地檔案讀取（若設定此項，會優先使用）
+  # openapi_file: "./openapi.json"
+  
+  # API 基礎 URL（若 OpenAPI 規格中未定義，則使用此值）
+  base_url: "http://localhost:8000"
+  #base_url: "https://opendata.cwa.gov.tw/api"
+  
+  # 請求超時時間（秒）
+  timeout: 30
+
+# MCP Server 設定
+mcp_server:
+  # Server 名稱（會顯示在 MCP client 中）
+  name: "採購系統 API"
+  
+  # Server 描述
+  description: "企業採購管理系統 MCP Service - 自動從 OpenAPI 規格生成"
+
+# Tool 生成設定
+tool_generation:
+  # 是否包含所有 API endpoints（預設為 true）
+  include_all: true
+  
+  # 若 include_all 為 false，可指定要包含的 endpoints（使用 operationId 或 path）
+  # include_endpoints:
+  #   - "get_purchase_history"
+  #   - "/api/inventory"
+  
+  # 要排除的 endpoints（支援 operationId 或 path pattern）
+  exclude_endpoints: []
+  
+  # Tool 名稱前綴（可選）
+  # tool_prefix: "procurement_"
+  
+  # 是否將 operationId 轉換為 snake_case
+  snake_case_names: true
+  
+  # 是否使用簡化的 tool 名稱（移除 _api_ 和 HTTP method 後綴）
+  simplified_names: true
+
+# LLM 設定（用於 client）
+llm:
+  # 模型提供者
+  provider: "openai"  # 支援: openai, azure, anthropic
+  
+  # 模型名稱
+  model: "gpt-4.1-mini"
+  
+  # Temperature
+  temperature: 0
+
+# System Prompt 設定
+system_prompt:
+  # 可以使用以下變數：
+  # {api_name} - API 名稱
+  # {api_description} - API 描述
+  # {tools_summary} - 自動生成的工具摘要
+  
+  template: |
+    你是一個專業的 AI 助手，可以透過以下 API 工具協助使用者完成任務。
+
+    ## 🎯 系統資訊
+    - API 名稱：{api_name}
+    - 描述：{api_description}
+
+    ## 🛠️ 可用工具
+    {tools_summary}
+
+    ## 📊 資料解讀規範
+
+    ### 工具回傳格式
+    所有工具都會回傳 JSON 格式的原始資料，你需要：
+    1. 解析 JSON 結構
+    2. 判斷 `success` 欄位是否為 true（若有）
+    3. 從 `data` 欄位提取實際內容（若有）
+    4. 以友善的格式呈現給使用者
+
+    ### 金額顯示規範
+    - 統一使用「NT$」作為貨幣符號
+    - 使用千分位格式，如：NT$ 42,000
+    - 計算總價時：總價 = 單價 × 數量
+
+    ### 日期顯示規範
+    - 使用 YYYY-MM-DD 格式
+    - 可適時補充「距今 X 天」等相對時間
+
+    ## 💬 對話風格
+
+    ### 語言
+    - 使用繁體中文
+    - 專業但親切的語氣
+    - 適度使用 emoji 增加可讀性
+
+    ### 主動性
+    - 發現資訊不足時，主動詢問
+    - 發現異常時，主動提醒
+    - 操作前確認關鍵資訊
+
+    ## ⚠️ 注意事項
+    1. **資料不存在**：查詢無結果時，清楚說明「查無資料」而非編造
+    2. **API 錯誤**：若 success=false，顯示 error 訊息並建議用戶稍後再試
+    3. **確認操作**：執行寫入操作前，確認用戶意圖
+
+    開始為用戶提供服務吧！
+
+# 進階設定
+advanced:
+  # 是否啟用除錯模式
+  debug: false
+  
+  # 自動重試次數
+  retry_count: 3
+  
+  # 是否快取 OpenAPI 規格
+  cache_openapi: true
+  
+  # 快取過期時間（秒）
+  cache_ttl: 3600
