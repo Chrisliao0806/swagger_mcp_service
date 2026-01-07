@@ -36,38 +36,41 @@ logging.getLogger("mcp.client.stdio").setLevel(logging.ERROR)
 
 def setup_logging():
     """設定 logging 格式"""
+
     # 建立自定義格式
     class ColoredFormatter(logging.Formatter):
         """帶顏色的 log 格式"""
-        
+
         COLORS = {
-            'DEBUG': '\033[36m',     # Cyan
-            'INFO': '\033[32m',      # Green
-            'WARNING': '\033[33m',   # Yellow
-            'ERROR': '\033[31m',     # Red
-            'CRITICAL': '\033[35m',  # Magenta
+            "DEBUG": "\033[36m",  # Cyan
+            "INFO": "\033[32m",  # Green
+            "WARNING": "\033[33m",  # Yellow
+            "ERROR": "\033[31m",  # Red
+            "CRITICAL": "\033[35m",  # Magenta
         }
-        RESET = '\033[0m'
-        
+        RESET = "\033[0m"
+
         def format(self, record):
             color = self.COLORS.get(record.levelname, self.RESET)
             record.levelname = f"{color}{record.levelname}{self.RESET}"
             record.msg = f"{color}{record.msg}{self.RESET}"
             return super().format(record)
-    
+
     # 設定 root logger
     handler = logging.StreamHandler()
-    handler.setFormatter(ColoredFormatter(
-        fmt='%(asctime)s │ %(levelname)-17s │ %(name)s │ %(message)s',
-        datefmt='%H:%M:%S'
-    ))
-    
+    handler.setFormatter(
+        ColoredFormatter(
+            fmt="%(asctime)s │ %(levelname)-17s │ %(name)s │ %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
+
     # 設定 logger
     logger = logging.getLogger("mcp_web")
     logger.setLevel(logging.DEBUG)
     logger.addHandler(handler)
     logger.propagate = False
-    
+
     return logger
 
 
@@ -137,7 +140,7 @@ class MCPWebServer:
 
     def _setup_routes(self):
         """設定路由"""
-        
+
         # 取得模板路徑
         templates_dir = Path(__file__).parent / "templates"
 
@@ -200,9 +203,11 @@ class MCPWebServer:
 
             messages = self.sessions[session_id]
             messages.append(HumanMessage(content=user_message))
-            
+
             # 記錄使用者訊息
-            user_msg_preview = user_message[:50] + "..." if len(user_message) > 50 else user_message
+            user_msg_preview = (
+                user_message[:50] + "..." if len(user_message) > 50 else user_message
+            )
             logger.info("💬 [Session %s] 使用者: %s", session_id[:8], user_msg_preview)
 
             return StreamingResponse(
@@ -237,12 +242,12 @@ class MCPWebServer:
         """產生 streaming 回應"""
         start_time = datetime.now()
         token_count = 0
-        
+
         try:
             # 使用 astream_events 來獲取 streaming 回應
             full_response = ""
             tool_calls = []
-            
+
             logger.debug("🚀 [Session %s] 開始 streaming 回應...", session_id[:8])
 
             async for event in self.agent.astream_events(
@@ -265,7 +270,9 @@ class MCPWebServer:
                 elif kind == "on_tool_start":
                     tool_name = event.get("name", "unknown")
                     tool_input = event.get("data", {}).get("input", {})
-                    logger.info("🔧 [Session %s] 呼叫工具: %s", session_id[:8], tool_name)
+                    logger.info(
+                        "🔧 [Session %s] 呼叫工具: %s", session_id[:8], tool_name
+                    )
                     input_preview = json.dumps(tool_input, ensure_ascii=False)[:100]
                     logger.debug("   └─ 輸入參數: %s...", input_preview)
                     yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'input': tool_input}, ensure_ascii=False)}\n\n"
@@ -274,8 +281,14 @@ class MCPWebServer:
                 elif kind == "on_tool_end":
                     tool_name = event.get("name", "unknown")
                     tool_output = event.get("data", {}).get("output", "")
-                    output_preview = str(tool_output)[:100] + "..." if len(str(tool_output)) > 100 else str(tool_output)
-                    logger.info("✅ [Session %s] 工具完成: %s", session_id[:8], tool_name)
+                    output_preview = (
+                        str(tool_output)[:100] + "..."
+                        if len(str(tool_output)) > 100
+                        else str(tool_output)
+                    )
+                    logger.info(
+                        "✅ [Session %s] 工具完成: %s", session_id[:8], tool_name
+                    )
                     logger.debug("   └─ 輸出結果: %s", output_preview)
                     # 傳送完整的工具輸出（前端可自行決定如何顯示）
                     yield f"data: {json.dumps({'type': 'tool_end', 'name': tool_name, 'output': str(tool_output)}, ensure_ascii=False)}\n\n"
@@ -287,8 +300,15 @@ class MCPWebServer:
 
             # 計算耗時
             elapsed = (datetime.now() - start_time).total_seconds()
-            response_preview = full_response[:80] + "..." if len(full_response) > 80 else full_response
-            logger.info("🤖 [Session %s] 助手回覆 (%.2fs, ~%d tokens)", session_id[:8], elapsed, token_count)
+            response_preview = (
+                full_response[:80] + "..." if len(full_response) > 80 else full_response
+            )
+            logger.info(
+                "🤖 [Session %s] 助手回覆 (%.2fs, ~%d tokens)",
+                session_id[:8],
+                elapsed,
+                token_count,
+            )
             logger.debug("   └─ 內容: %s", response_preview)
 
             # 發送結束事件
@@ -322,7 +342,7 @@ class MCPWebServer:
         self, server_config: Dict[str, Any], server_index: int = 0
     ) -> Optional[List]:
         """連接 OpenAPI 類型的 MCP Server
-        
+
         Args:
             server_config: Server 配置
             server_index: 在所有 enabled openapi servers 中的索引
@@ -362,7 +382,7 @@ class MCPWebServer:
             tools_info = [
                 {
                     "name": tool.name,
-                    "description": tool.description[:300] if tool.description else ""
+                    "description": tool.description[:300] if tool.description else "",
                 }
                 for tool in tools
             ]
@@ -375,7 +395,7 @@ class MCPWebServer:
                     "tools": tools_info,
                 }
             )
-            
+
             logger.info("   ✅ %s: 載入 %d 個工具", server_name, len(tools))
             return tools
 
@@ -402,7 +422,7 @@ class MCPWebServer:
                 env=full_env,
             )
 
-            logger.debug("   🚀 啟動外部 MCP Server: %s %s", command, ' '.join(args))
+            logger.debug("   🚀 啟動外部 MCP Server: %s %s", command, " ".join(args))
             transport = await self.stack.enter_async_context(
                 stdio_client(server_params)
             )
@@ -419,7 +439,7 @@ class MCPWebServer:
             tools_info = [
                 {
                     "name": tool.name,
-                    "description": tool.description[:300] if tool.description else ""
+                    "description": tool.description[:300] if tool.description else "",
                 }
                 for tool in tools
             ]
@@ -522,7 +542,9 @@ class MCPWebServer:
 
             tools = None
             if server_type == "openapi":
-                tools = await self._connect_openapi_server(server_config, openapi_server_index)
+                tools = await self._connect_openapi_server(
+                    server_config, openapi_server_index
+                )
                 openapi_server_index += 1  # 遞增 openapi server 索引
             elif server_type == "external":
                 tools = await self._connect_external_server(server_config)
@@ -543,7 +565,7 @@ class MCPWebServer:
         llm_config = self.config.get("llm", {})
         model = os.getenv("OPENAI_MODEL", llm_config.get("model", "gpt-4.1-mini"))
         logger.info("🤖 使用 LLM 模型: %s", model)
-        
+
         self.llm = self._get_llm()
         self.agent = create_react_agent(self.llm, self.all_tools)
         logger.info("✅ Agent 初始化完成")
@@ -585,9 +607,9 @@ async def main():
 
     # 啟動 uvicorn（使用較低的 log level 避免重複）
     config = uvicorn.Config(
-        app, 
-        host="0.0.0.0", 
-        port=port, 
+        app,
+        host="0.0.0.0",
+        port=port,
         log_level="warning",
         access_log=False,
     )
