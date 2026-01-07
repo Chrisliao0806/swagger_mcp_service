@@ -70,12 +70,12 @@ mcp_servers:
   # --------------------------------------------------
   # 更多第三方 MCP Server 範例（預設停用）
   # --------------------------------------------------
-  # - name: "Filesystem"
-  #   type: "external"
-  #   enabled: false
-  #   command: "npx"
-  #   args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]
-  #   description: "存取本地檔案系統"
+  - name: "Filesystem"
+    type: "external"
+    enabled: true
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/liaopoyu/Desktop"] # 指定要存取的目錄
+    description: "存取本地檔案系統"
 
   # - name: "GitHub"
   #   type: "external"
