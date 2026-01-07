@@ -23,7 +23,9 @@
 - 🤖 **LLM-Ready** - Works with OpenAI GPT models out of the box via LangChain
 - 📋 **Smart Parsing** - Supports Swagger UI, ReDoc, and direct OpenAPI JSON endpoints
 - ⚙️ **Highly Configurable** - Customize tool names, filters, system prompts, and more via YAML
-- 🔌 **Extensible Architecture** - Clean separation between server, client, and parser components
+- 🔌 **Multi-Server Support** - Connect to multiple MCP servers simultaneously (OpenAPI + third-party)
+- 🆕 **Auto Tool Discovery** - Automatically fetches tool descriptions from third-party MCP servers
+- 🧩 **Extensible Architecture** - Clean separation between server, client, and parser components
 
 ---
 
@@ -39,34 +41,35 @@
 │   │   (run.py)   │     │ (client.py)  │◀────│    via LangChain     │   │
 │   └──────────────┘     └──────┬───────┘     └──────────────────────┘   │
 │                               │                                          │
-│                               │ stdio                                    │
-│                               ▼                                          │
-│                        ┌──────────────┐                                  │
-│                        │  MCP Server  │                                  │
-│                        │ (server.py)  │                                  │
-│                        └──────┬───────┘                                  │
-│                               │                                          │
-│                               │ Dynamic Tool Registration                │
-│                               ▼                                          │
-│                     ┌─────────────────────┐                              │
-│                     │   OpenAPI Parser    │                              │
-│                     │ (openapi_parser.py) │                              │
-│                     └─────────┬───────────┘                              │
-│                               │                                          │
-│                               │ Parse & Transform                        │
-│                               ▼                                          │
-│                    ┌──────────────────────┐                              │
-│                    │   OpenAPI/Swagger    │                              │
-│                    │    Specification     │                              │
-│                    └──────────┬───────────┘                              │
-│                               │                                          │
-└───────────────────────────────┼──────────────────────────────────────────┘
-                                │ HTTP Requests
-                                ▼
-                        ┌──────────────┐
-                        │  Target API  │
-                        │   Server     │
-                        └──────────────┘
+│                               │ stdio (multiple connections)             │
+│                    ┌──────────┴──────────┐                               │
+│                    ▼                     ▼                               │
+│            ┌──────────────┐     ┌──────────────────┐                    │
+│            │  MCP Server  │     │  3rd Party MCP   │                    │
+│            │ (server.py)  │     │ (mcp-server-*)   │                    │
+│            └──────┬───────┘     └──────────────────┘                    │
+│                   │                                                      │
+│                   │ Dynamic Tool Registration                            │
+│                   ▼                                                      │
+│         ┌─────────────────────┐                                          │
+│         │   OpenAPI Parser    │                                          │
+│         │ (openapi_parser.py) │                                          │
+│         └─────────┬───────────┘                                          │
+│                   │                                                      │
+│                   │ Parse & Transform                                    │
+│                   ▼                                                      │
+│        ┌──────────────────────┐                                          │
+│        │   OpenAPI/Swagger    │                                          │
+│        │    Specification     │                                          │
+│        └──────────┬───────────┘                                          │
+│                   │                                                      │
+└───────────────────┼──────────────────────────────────────────────────────┘
+                    │ HTTP Requests
+                    ▼
+            ┌──────────────┐
+            │  Target API  │
+            │   Server     │
+            └──────────────┘
 ```
 
 ### Component Overview
@@ -132,12 +135,69 @@ api:
   timeout: 30
 ```
 
-### MCP Server Settings
+### MCP Servers Configuration (Multi-Server Support)
 
 ```yaml
-mcp_server:
-  name: "My API Service"
-  description: "Description of your MCP service"
+mcp_servers:
+  # OpenAPI/Swagger type server
+  - name: "My API Service"
+    type: "openapi"
+    enabled: true
+    openapi:
+      openapi_url: "http://localhost:8000/openapi.json"
+      base_url: "http://localhost:8000"
+    tool_generation:
+      include_all: true
+      snake_case_names: true
+
+  # Third-party MCP server (auto tool discovery!)
+  - name: "Fetch"
+    type: "external"
+    enabled: true
+    command: "uvx"
+    args: ["mcp-server-fetch"]
+    # 🆕 No need to write description/tools_description!
+    # They are automatically fetched from the MCP server
+```
+
+### Third-Party MCP Servers
+
+You can connect to any third-party MCP server. **Tool descriptions are automatically discovered!**
+
+```yaml
+mcp_servers:
+  # Example: mcp-server-fetch
+  - name: "Fetch"
+    type: "external"
+    enabled: true
+    command: "uvx"
+    args: ["mcp-server-fetch"]
+
+  # Example: Filesystem server
+  - name: "Filesystem"
+    type: "external"
+    enabled: true
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
+
+  # Example: GitHub server with environment variables
+  - name: "GitHub"
+    type: "external"
+    enabled: true
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+
+  # Optional: Override auto-discovered descriptions
+  - name: "Custom Server"
+    type: "external"
+    enabled: true
+    command: "my-mcp-server"
+    args: []
+    description: "Custom description (optional)"
+    tools_description: |  # Optional - overrides auto-discovery
+      - **tool_name**: Custom tool description
 ```
 
 ### Tool Generation Options
@@ -335,9 +395,41 @@ Access the Swagger UI at: http://localhost:8000/docs
 Simply update `config.yaml` to point to any OpenAPI-compliant API:
 
 ```yaml
-api:
-  openapi_url: "https://api.example.com/openapi.json"
-  base_url: "https://api.example.com"
+mcp_servers:
+  - name: "External API"
+    type: "openapi"
+    enabled: true
+    openapi:
+      openapi_url: "https://api.example.com/openapi.json"
+      base_url: "https://api.example.com"
+```
+
+### Combining Multiple MCP Servers
+
+You can combine OpenAPI servers with third-party MCP servers:
+
+```yaml
+mcp_servers:
+  # Your internal API
+  - name: "Internal API"
+    type: "openapi"
+    enabled: true
+    openapi:
+      openapi_url: "http://localhost:8000/openapi.json"
+  
+  # Web content fetching
+  - name: "Fetch"
+    type: "external"
+    enabled: true
+    command: "uvx"
+    args: ["mcp-server-fetch"]
+  
+  # File system access
+  - name: "Filesystem"
+    type: "external"
+    enabled: true
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "./data"]
 ```
 
 ### Connecting to Enterprise Systems
@@ -347,6 +439,7 @@ The service can integrate with:
 - Salesforce APIs
 - AWS services with OpenAPI specs
 - Any REST API with Swagger/OpenAPI documentation
+- Third-party MCP servers from the community
 
 ---
 
