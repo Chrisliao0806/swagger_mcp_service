@@ -13,13 +13,13 @@ from typing import List, Dict, Any, Optional
 from contextlib import AsyncExitStack
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain_mcp import MCPToolkit
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage, HumanMessage
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from openapi_parser import OpenAPIParser, load_config
+from mcp_utils import get_mcp_tools
 
 # 抑制 MCP client 的 JSONRPC 解析警告（第三方 server 可能產生）
 logging.getLogger("mcp.client.stdio").setLevel(logging.ERROR)
@@ -191,10 +191,13 @@ class GenericMCPClient:
         return value
 
     async def _connect_openapi_server(
-        self, server_config: Dict[str, Any], stack: AsyncExitStack, server_index: int = 0
+        self,
+        server_config: Dict[str, Any],
+        stack: AsyncExitStack,
+        server_index: int = 0,
     ) -> Optional[List]:
         """連接 OpenAPI 類型的 MCP Server
-        
+
         Args:
             server_config: Server 配置
             stack: AsyncExitStack
@@ -228,10 +231,8 @@ class GenericMCPClient:
             session = await stack.enter_async_context(ClientSession(read, write))
             await session.initialize()
 
-            # 獲取工具
-            toolkit = MCPToolkit(session=session)
-            await toolkit.initialize()
-            tools = toolkit.get_tools()
+            # 獲取工具（使用官方 MCP SDK）
+            tools = await get_mcp_tools(session)
 
             # 記錄連接資訊
             api_info = parsed_spec.get("api_info", {})
@@ -280,10 +281,8 @@ class GenericMCPClient:
             session = await stack.enter_async_context(ClientSession(read, write))
             await session.initialize()
 
-            # 獲取工具
-            toolkit = MCPToolkit(session=session)
-            await toolkit.initialize()
-            tools = toolkit.get_tools()
+            # 獲取工具（使用官方 MCP SDK）
+            tools = await get_mcp_tools(session)
 
             # 自動從 MCP server 獲取工具描述（如果 config 沒有提供）
             auto_description = server_config.get("description", "")
@@ -291,7 +290,9 @@ class GenericMCPClient:
 
             if not auto_tools_description and tools:
                 # 自動生成工具描述
-                auto_tools_description = self._generate_tools_description_from_mcp(tools)
+                auto_tools_description = self._generate_tools_description_from_mcp(
+                    tools
+                )
 
             if not auto_description and tools:
                 # 使用第一個工具的描述作為 server 描述（簡化版）
@@ -331,16 +332,24 @@ class GenericMCPClient:
                     if hasattr(schema, "model_fields"):
                         # Pydantic v2
                         for field_name, field_info in schema.model_fields.items():
-                            required = "(必填)" if field_info.is_required() else "(可選)"
+                            required = (
+                                "(必填)" if field_info.is_required() else "(可選)"
+                            )
                             field_desc = field_info.description or ""
                             lines.append(f"  - {field_name} {required}: {field_desc}")
                     elif hasattr(schema, "schema"):
                         # 嘗試從 JSON schema 獲取
-                        json_schema = schema.schema() if callable(schema.schema) else schema.schema
+                        json_schema = (
+                            schema.schema()
+                            if callable(schema.schema)
+                            else schema.schema
+                        )
                         properties = json_schema.get("properties", {})
                         required_fields = json_schema.get("required", [])
                         for prop_name, prop_info in properties.items():
-                            required = "(必填)" if prop_name in required_fields else "(可選)"
+                            required = (
+                                "(必填)" if prop_name in required_fields else "(可選)"
+                            )
                             prop_desc = prop_info.get("description", "")
                             lines.append(f"  - {prop_name} {required}: {prop_desc}")
                 except Exception:
@@ -368,7 +377,9 @@ class GenericMCPClient:
 
                 tools = None
                 if server_type == "openapi":
-                    tools = await self._connect_openapi_server(server_config, stack, openapi_server_index)
+                    tools = await self._connect_openapi_server(
+                        server_config, stack, openapi_server_index
+                    )
                     openapi_server_index += 1  # 遞增 openapi server 索引
                 elif server_type == "external":
                     tools = await self._connect_external_server(server_config, stack)
