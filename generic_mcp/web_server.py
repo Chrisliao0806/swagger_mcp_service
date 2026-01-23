@@ -22,13 +22,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from langchain_openai import ChatOpenAI
-from langchain_mcp import MCPToolkit
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from openapi_parser import OpenAPIParser, load_config
+from mcp_utils import get_mcp_tools
 
 # 抑制 MCP client 的 JSONRPC 解析警告
 logging.getLogger("mcp.client.stdio").setLevel(logging.ERROR)
@@ -373,9 +373,7 @@ class MCPWebServer:
             session = await self.stack.enter_async_context(ClientSession(read, write))
             await session.initialize()
 
-            toolkit = MCPToolkit(session=session)
-            await toolkit.initialize()
-            tools = toolkit.get_tools()
+            tools = await get_mcp_tools(session)
 
             api_info = parsed_spec.get("api_info", {})
             # 收集工具詳情
@@ -431,9 +429,7 @@ class MCPWebServer:
             session = await self.stack.enter_async_context(ClientSession(read, write))
             await session.initialize()
 
-            toolkit = MCPToolkit(session=session)
-            await toolkit.initialize()
-            tools = toolkit.get_tools()
+            tools = await get_mcp_tools(session)
 
             # 收集工具詳情
             tools_info = [
