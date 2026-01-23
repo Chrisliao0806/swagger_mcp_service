@@ -103,6 +103,18 @@ mcp_servers:
     args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/liaopoyu/Desktop"] # 指定要存取的目錄
     description: "存取本地檔案系統"
 
+  # --------------------------------------------------
+  # Gmail MCP Server - 發送郵件
+  # --------------------------------------------------
+  - name: "Gmail"
+    type: "external"
+    enabled: true
+    command: "python"
+    args: ["generic_mcp/gmail_server.py"]
+    description: "透過 Gmail 發送郵件"
+    # 注意：第一次使用需要進行 OAuth 授權
+    # 請確保已將 credentials.json 放到 generic_mcp/ 目錄下
+
   # - name: "GitHub"
   #   type: "external"
   #   enabled: false
