@@ -17,5 +17,11 @@ python-dotenv>=1.2.0
 # Generic MCP Dependencies
 pyyaml>=6.0.0
 
+# Gmail MCP Dependencies
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.0.0
+
 # Web Chat UI Dependencies (SSE Streaming)
 sse-starlette>=2.0.0
