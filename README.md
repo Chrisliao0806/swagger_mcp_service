@@ -78,8 +78,7 @@
                        │ HTTP Requests
                        ▼
                ┌──────────────┐
-    Web Server** | `web_server.py` | 🌐 Beautiful web chat interface with real-time streaming responses |
-| **           │  Target API  │
+               │  Target API  │
                │   Server     │
                └──────────────┘
 ```
@@ -106,7 +105,7 @@
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/swagger_mcp_service.git
+git clone https://github.com/Chrisliao0806/swagger_mcp_service.git
 cd swagger_mcp_service
 ```
 
@@ -222,6 +221,26 @@ tool_generation:
   simplified_names: true               # Simplify tool names
   # tool_prefix: "myapi_"              # Optional prefix for all tools
 ```
+
+Each OpenAPI server can also define request headers. Use full environment
+variable references so credentials stay outside the configuration file:
+
+```yaml
+openapi:
+  openapi_url: "https://example.com/openapi.json"
+  base_url: "https://example.com"
+  headers:
+    Authorization: "${EXAMPLE_API_TOKEN}"
+```
+
+The service stops with a clear error when a referenced variable is missing.
+
+The disabled Xquik sample in `generic_mcp/config.yaml` uses this mechanism with
+`XQUIK_API_KEY`. It exposes an explicit read-first subset for tweet search,
+tweet lookup, replies, trends, user search, and user lookup. Enable the sample
+only after configuring that variable.
+
+Xquik is an independent third-party service. Not affiliated with X Corp. "Twitter" and "X" are trademarks of X Corp.
 
 ### LLM Configuration
 
@@ -570,7 +589,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [Model Context Protocol (MCP)](https://github.com/anthropics/mcp) - The protocol that makes this possible
+- [Model Context Protocol servers](https://github.com/modelcontextprotocol/servers) - Reference servers and community resources
 - [FastMCP](https://github.com/jlowin/fastmcp) - Simplified MCP server implementation
 - [LangChain](https://github.com/langchain-ai/langchain) - LLM application framework
 - [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework

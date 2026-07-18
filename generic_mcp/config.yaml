@@ -69,6 +69,29 @@ mcp_servers:
       snake_case_names: true
       simplified_names: true
 
+  - name: "Xquik OpenAPI"
+    type: "openapi"
+    enabled: false
+
+    openapi:
+      openapi_url: "https://xquik.com/openapi.json"
+      base_url: "https://xquik.com"
+      timeout: 30
+      headers:
+        x-api-key: "${XQUIK_API_KEY}"
+
+    tool_generation:
+      include_all: false
+      include_endpoints:
+        - searchTweets
+        - lookupTweet
+        - getTweetReplies
+        - getXTrends
+        - searchUsers
+        - getUser
+      snake_case_names: true
+      simplified_names: true
+
   # --------------------------------------------------
   # 第三方 MCP Server：mcp-server-fetch
   # --------------------------------------------------

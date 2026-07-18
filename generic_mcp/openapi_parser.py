@@ -5,10 +5,32 @@ OpenAPI Parser
 
 import httpx
 import json
+import os
 import re
 from typing import Any, Optional
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
+
+
+ENVIRONMENT_VARIABLE_PATTERN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
+
+
+def expand_header_environment_variables(headers: dict) -> dict[str, str]:
+    """Expand full environment-variable references in configured HTTP headers."""
+    expanded = {}
+    for name, value in headers.items():
+        string_value = str(value)
+        match = ENVIRONMENT_VARIABLE_PATTERN.fullmatch(string_value)
+        if match is not None:
+            variable_name = match.group(1)
+            string_value = os.getenv(variable_name, "")
+            if not string_value:
+                raise ValueError(
+                    f"HTTP header {name!r} requires environment variable "
+                    f"{variable_name!r}"
+                )
+        expanded[str(name)] = string_value
+    return expanded
 
 
 class OpenAPIParser:
@@ -26,17 +48,30 @@ class OpenAPIParser:
 
     def _get_api_config(self) -> dict:
         """取得 API 配置（支援新舊格式）"""
-        # 新格式：從 mcp_servers 中找指定索引的 openapi 類型的 server
-        if "mcp_servers" in self.config:
-            openapi_servers = [
-                server for server in self.config["mcp_servers"]
-                if server.get("type") == "openapi" and server.get("enabled", True)
-            ]
-            if openapi_servers and self.server_index < len(openapi_servers):
-                return openapi_servers[self.server_index].get("openapi", {})
+        server_config = self._get_server_config()
+        if server_config is not None:
+            return server_config.get("openapi", {})
 
         # 舊格式：直接使用 api 區塊
         return self.config.get("api", {})
+
+    def _get_server_config(self) -> Optional[dict]:
+        """取得目前啟用的 OpenAPI server 配置。"""
+        openapi_servers = [
+            server
+            for server in self.config.get("mcp_servers", [])
+            if server.get("type") == "openapi" and server.get("enabled", True)
+        ]
+        if self.server_index < len(openapi_servers):
+            return openapi_servers[self.server_index]
+        return None
+
+    def _get_tool_config(self) -> dict:
+        """取得目前 server 的工具生成配置，並支援舊格式。"""
+        server_config = self._get_server_config()
+        if server_config is not None:
+            return server_config.get("tool_generation", {})
+        return self.config.get("tool_generation", {})
 
     def load_spec(self) -> dict:
         """載入 OpenAPI 規格（從 URL 或檔案）"""
@@ -351,7 +386,7 @@ class OpenAPIParser:
         """從 OpenAPI paths 生成 MCP tool 定義"""
         tools = []
         paths = self.openapi_spec.get("paths", {})
-        tool_config = self.config.get("tool_generation", {})
+        tool_config = self._get_tool_config()
 
         include_all = tool_config.get("include_all", True)
         include_endpoints = tool_config.get("include_endpoints", [])
