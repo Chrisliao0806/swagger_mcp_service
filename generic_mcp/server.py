@@ -85,7 +85,11 @@ from typing import Any, Optional, Callable
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
-from openapi_parser import OpenAPIParser, load_config
+from openapi_parser import (
+    OpenAPIParser,
+    expand_header_environment_variables,
+    load_config,
+)
 
 # 設定 logger
 logger = logging.getLogger(__name__)
@@ -118,6 +122,9 @@ class GenericMCPServer:
         self.base_url = self.parsed_spec["base_url"]
         self.tools_def = self.parsed_spec["tools"]
         self.timeout = self._get_timeout()
+        self.headers = expand_header_environment_variables(
+            self._get_api_config().get("headers", {})
+        )
 
         logger.info(
             "API 資訊: %s (版本: %s)",
@@ -205,15 +212,34 @@ class GenericMCPServer:
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 if method.upper() == "GET":
-                    response = client.get(url, params=query_params)
+                    response = client.get(
+                        url, params=query_params, headers=self.headers
+                    )
                 elif method.upper() == "POST":
-                    response = client.post(url, params=query_params, json=json_data)
+                    response = client.post(
+                        url,
+                        params=query_params,
+                        json=json_data,
+                        headers=self.headers,
+                    )
                 elif method.upper() == "PUT":
-                    response = client.put(url, params=query_params, json=json_data)
+                    response = client.put(
+                        url,
+                        params=query_params,
+                        json=json_data,
+                        headers=self.headers,
+                    )
                 elif method.upper() == "PATCH":
-                    response = client.patch(url, params=query_params, json=json_data)
+                    response = client.patch(
+                        url,
+                        params=query_params,
+                        json=json_data,
+                        headers=self.headers,
+                    )
                 elif method.upper() == "DELETE":
-                    response = client.delete(url, params=query_params)
+                    response = client.delete(
+                        url, params=query_params, headers=self.headers
+                    )
                 else:
                     logger.warning("不支援的 HTTP 方法: %s", method)
                     return {
